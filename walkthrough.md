@@ -16,3 +16,4 @@ created server.ts : #L1-33
 created src/lib/discovery/udp.ts : #L1-27
 created src/lib/discovery/qr/route.ts : #L1-41
 created src/conponents/pairing/QRgenerator.tsx : #L1-67
+ran command : npm i axios

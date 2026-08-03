@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import axios from "axios";
 import { QRCodeSVG } from "qrcode.react";
 
 interface QRPayload {
@@ -19,15 +20,14 @@ export default function QRGenerator() {
     const fetchQRData = async () => {
       setLoading(true);
       try {
-        const res = await fetch("/api/discovery/qr");
-        const json = await res.json();
-        if (json.success) {
-          setPayload(json.data);
+        const res = await axios.get("/api/discovery/qr");
+        if (res.data.success) {
+          setPayload(res.data.data);
         } else {
-          setError(json.error || "Failed to load QR data");
+          setError(res.data.error || "Failed to load QR data");
         }
-      } catch (err) {
-        setError("Network error loading QR data");
+      } catch (err: any) {
+        setError(err.response?.data?.error || "Network error loading QR data");
       } finally {
         setLoading(false);
       }
