@@ -13,3 +13,6 @@ created src/lib/utils/ApiError.ts : #L1-12
 created src/lib/utils/ApiResponse.ts : #L1-17
 created src/lib/utils/asyncHandler.ts : #L1-21
 created server.ts : #L1-33
+created src/lib/discovery/udp.ts : #L1-27
+created src/lib/discovery/qr/route.ts : #L1-41
+created src/conponents/pairing/QRgenerator.tsx : #L1-67

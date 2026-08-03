@@ -1,4 +1,5 @@
 import { connectDB } from "@/db/sqlite";
+import { initUDP } from "@/lib/discovery/udp";
 import { createServer } from "http";
 import next from "next";
 import { parse } from "url";
@@ -12,6 +13,7 @@ const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
   connectDB();
+  initUDP();
   console.log(`Connected to SQLite database`);
 
   const server = createServer(async (req, res) => {
