@@ -10,7 +10,7 @@ interface PairingRequest {
   device_name: string;
 }
 
-export default function PairingModal() {
+export default function PairingCheckingModal() {
   const [request, setRequest] = useState<PairingRequest | null>(null);
   
   // Note: For now this is just a placeholder hook call. 
