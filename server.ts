@@ -1,5 +1,6 @@
 import { connectDB } from "@/db/sqlite";
 import { initUDP } from "@/lib/discovery/udp";
+import { initSocket } from "@/lib/socket";
 import { createServer } from "http";
 import next from "next";
 import { parse } from "url";
@@ -26,6 +27,7 @@ app.prepare().then(() => {
       res.end("Internal Server Error");
     }
   });
+  initSocket(server);
 
   server.listen(port, (err?: any) => {
     if (err) throw err;
