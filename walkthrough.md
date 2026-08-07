@@ -32,3 +32,7 @@ created src/components/chat/ChatWindow.tsx : #L1-105
 updated src/components/devices/DeviceCard.tsx : #L1-46
 updated src/components/devices/DeviceManager.tsx : #L1-53
 updated src/app/page.tsx : #L1-31
+created src/app/api/upload/route.ts : #L1-35
+created src/app/api/file/route.ts : #L1-33
+updated src/app/api/chat/route.ts : #L1-20
+updated src/components/chat/ChatWindow.tsx : #L1-120
