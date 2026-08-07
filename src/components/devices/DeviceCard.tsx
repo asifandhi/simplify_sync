@@ -7,22 +7,27 @@ interface Props {
     device_name: string;
     last_active: string;
   };
+  onClick?: () => void;
 }
 
-export default function DeviceCard({ device }: Props) {
+export default function DeviceCard({ device, onClick }: Props) {
   const removeDevice = useDeviceStore(state => state.removeDevice);
 
-  const handleRevoke = async () => {
+  const handleRevoke = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering the card click
     try {
       await axios.delete(`/api/devices/${device.device_id}`);
-      removeDevice(device.device_id); // Remove it from the UI immediately
+      removeDevice(device.device_id);
     } catch (err) {
       console.error('Failed to revoke device', err);
     }
   };
 
   return (
-    <div className="flex items-center justify-between p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+    <div 
+      onClick={onClick}
+      className="flex items-center justify-between p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+    >
       <div className="flex items-center gap-4">
         <div className="text-3xl">📱</div>
         <div>

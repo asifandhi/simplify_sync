@@ -24,3 +24,11 @@ created src/app/api/device/[id]/route.ts : #L1-28
 created src/store/deviceStore.ts : #L1-19
 created src/components/devices/DeviceCard.tsx : #L1-37
 created src/components/devices/DeviceManager.tsx : #L1-41
+created src/lib/socket/index.ts : #L1-49
+updated server.ts : #L1-36
+created src/store/chatStore.ts : #L1-69
+created src/app/api/chat/route.ts : #L1-16
+created src/components/chat/ChatWindow.tsx : #L1-105
+updated src/components/devices/DeviceCard.tsx : #L1-46
+updated src/components/devices/DeviceManager.tsx : #L1-53
+updated src/app/page.tsx : #L1-31

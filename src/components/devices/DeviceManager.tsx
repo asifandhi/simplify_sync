@@ -5,7 +5,11 @@ import axios from 'axios';
 import { useDeviceStore } from '@/store/deviceStore';
 import DeviceCard from './DeviceCard';
 
-export default function DeviceManager() {
+interface Props {
+  onSelectDevice?: (deviceId: string, deviceName: string) => void;
+}
+
+export default function DeviceManager({ onSelectDevice }: Props) {
   const { devices, setDevices } = useDeviceStore();
   const [loading, setLoading] = useState(true);
 
@@ -39,7 +43,11 @@ export default function DeviceManager() {
       ) : (
         <div className="grid gap-3">
           {devices.map((device) => (
-            <DeviceCard key={device.device_id} device={device} />
+            <DeviceCard 
+              key={device.device_id} 
+              device={device} 
+              onClick={() => onSelectDevice && onSelectDevice(device.device_id, device.device_name)}
+            />
           ))}
         </div>
       )}
