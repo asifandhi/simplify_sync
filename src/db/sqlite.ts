@@ -4,6 +4,8 @@ const db_path = process.env.DB_PATH;
 
 const db = new Database(db_path);
 
+connectDB();
+
 export function connectDB() {
   try {
     db.exec(
