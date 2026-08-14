@@ -35,4 +35,7 @@ updated src/app/page.tsx : #L1-31
 created src/app/api/upload/route.ts : #L1-35
 created src/app/api/file/route.ts : #L1-33
 updated src/app/api/chat/route.ts : #L1-20
-updated src/components/chat/ChatWindow.tsx : #L1-120
+updated src/components/chat/ChatWindow.tsx : #L1-247
+updated src/app/api/upload/route.ts : #L1-37
+updated src/db/sqlite.ts : #L1-192
+created src/app/api/debug-pair/route.ts : #L1-17

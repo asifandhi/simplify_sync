@@ -2,17 +2,22 @@ import { useChatStore } from "@/store/chatStore";
 import axios from "axios";
 import React, { useEffect, useRef, useState } from "react";
 import { Paperclip, File as FileIcon } from "lucide-react";
+import { useClipboardSync } from "@/hooks/useClipboardSync";
+
+
 
 interface ChatWindowProps {
   deviceId: string;
   deviceName: string;
 }
 function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
-  const { messages, connectSocket, setMessages, sendMessage } = useChatStore();
+  const { messages, connectSocket, setMessages, sendMessage,socket } = useChatStore();
   console.log("this is the use chat store : ", useChatStore);
   const [input, setInput] = useState("");
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  
+  const { syncLocalClipboard, error } = useClipboardSync(socket,deviceId)
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -162,8 +167,22 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
         </div>
       )}
       {/* Header */}
+           {/* Header */}
       <div className="px-6 py-4 border-b border-white/20 bg-white/40 flex items-center justify-between">
         <h2 className="font-semibold text-gray-800 text-lg">{deviceName}</h2>
+        
+        {/*  Clipboard Sync UI */}
+        <div className="flex items-center gap-3">
+          {error && <span className="text-xs text-red-500 font-medium">{error}</span>}
+          <button
+            onClick={syncLocalClipboard}
+            className="text-sm bg-white border border-[#007aff]/30 text-[#007aff] px-4 py-1.5 rounded-full hover:bg-[#007aff]/10 transition-colors shadow-sm font-medium flex items-center gap-2"
+            title="Push local clipboard to this device"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+            Sync Clipboard
+          </button>
+        </div>
       </div>
       {/* Messages Area */}
       <div className="flex-1 p-6 overflow-y-auto space-y-4" ref={scrollRef}>
