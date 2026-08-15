@@ -15,8 +15,8 @@ export default function QRGenerator() {
   const [payload, setPayload] = useState<QRPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  
   useEffect(() => {
-    // Fetch the QR payload when the component loads
     const fetchQRData = async () => {
       setLoading(true);
       try {
@@ -33,34 +33,29 @@ export default function QRGenerator() {
       }
     };
     fetchQRData();
-    // Auto-refresh the QR code every 5 minutes before it expires
     const interval = setInterval(fetchQRData, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
-  if (error) return <div className="text-red-500">{error}</div>;
+  if (error) return <div className="text-[var(--color-error)] font-medium text-center p-4">{error}</div>;
   if (!payload || loading)
-    return <div className="text-gray-500">Generating QR code...</div>;
+    return <div className="text-[var(--color-on-surface-variant)] text-center p-4">Generating QR code...</div>;
 
   const qrString = JSON.stringify(payload);
 
   return (
-    <div className="flex flex-col items-center justify-center p-6 bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-800">
-      <h3 className="text-lg font-semibold mb-4 text-zinc-800 dark:text-zinc-100">
-        Scan to Connect
-      </h3>
-
-      <div className="p-4 bg-white rounded-xl">
+    <div className="flex flex-col items-center justify-center p-8 bg-[var(--color-surface-container)] rounded-3xl shadow-lg border border-[var(--color-outline-variant)]/30">
+      <div className="p-4 bg-white rounded-2xl mb-6 shadow-[0_0_20px_rgba(255,255,255,0.05)]">
         <QRCodeSVG
           value={qrString}
-          size={200}
+          size={220}
           level="H"
           includeMargin={false}
-        
-
+          bgColor="#ffffff"
+          fgColor="#131313"
         />
       </div>
-      <p className="mt-6 text-sm text-zinc-500 font-mono bg-zinc-100 dark:bg-zinc-800 px-3 py-1 rounded-md">
+      <p className="text-sm text-[var(--color-on-surface-variant)] font-label-sm tracking-wider bg-[var(--color-surface-container-high)] border border-[var(--color-outline-variant)]/30 px-4 py-1.5 rounded-full">
         {payload.ip}:{payload.port}
       </p>
     </div>

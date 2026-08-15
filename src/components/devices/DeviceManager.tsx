@@ -7,9 +7,10 @@ import DeviceCard from './DeviceCard';
 
 interface Props {
   onSelectDevice?: (deviceId: string, deviceName: string) => void;
+  selectedDeviceId?: string | null;
 }
 
-export default function DeviceManager({ onSelectDevice }: Props) {
+export default function DeviceManager({ onSelectDevice, selectedDeviceId }: Props) {
   const { devices, setDevices } = useDeviceStore();
   const [loading, setLoading] = useState(true);
 
@@ -30,26 +31,23 @@ export default function DeviceManager({ onSelectDevice }: Props) {
     fetchDevices();
   }, [setDevices]);
 
-  if (loading) return <div className="text-zinc-500">Loading devices...</div>;
+  if (loading) return <div className="p-4 text-center text-[var(--color-on-surface-variant)] text-sm">Loading...</div>;
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold text-zinc-800 dark:text-zinc-100 mb-6">Connected Devices</h2>
-      
+    <div className="flex flex-col gap-1">
       {devices.length === 0 ? (
-        <div className="p-8 text-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-500">
+        <div className="p-8 text-center text-[var(--color-on-surface-variant)] text-sm italic">
           No devices paired yet.
         </div>
       ) : (
-        <div className="grid gap-3">
-          {devices.map((device) => (
-            <DeviceCard 
-              key={device.device_id} 
-              device={device} 
-              onClick={() => onSelectDevice && onSelectDevice(device.device_id, device.device_name)}
-            />
-          ))}
-        </div>
+        devices.map((device) => (
+          <DeviceCard 
+            key={device.device_id} 
+            device={device} 
+            isActive={device.device_id === selectedDeviceId}
+            onClick={() => onSelectDevice && onSelectDevice(device.device_id, device.device_name)}
+          />
+        ))
       )}
     </div>
   );

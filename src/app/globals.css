@@ -1,42 +1,140 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-primary: var(--primary);
+  --color-outline: #8e9192;
+  --color-surface-dim: #131313;
+  --color-on-primary-fixed: #1a1c1c;
+  --color-on-surface: #e5e2e1;
+  --color-on-tertiary-container: #656464;
+  --color-primary: #ffffff;
+  --color-surface-container: #201f1f;
+  --color-secondary-fixed-dim: #c8c6c5;
+  --color-on-primary-fixed-variant: #454747;
+  --color-error-container: #93000a;
+  --color-surface-variant: #353534;
+  --color-tertiary-fixed: #e5e2e1;
+  --color-surface-container-high: #2a2a2a;
+  --color-secondary-fixed: #e5e2e1;
+  --color-tertiary-container: #e5e2e1;
+  --color-primary-container: #e2e2e2;
+  --color-on-tertiary-fixed: #1c1b1b;
+  --color-surface-bright: #3a3939;
+  --color-surface: #131313;
+  --color-tertiary: #ffffff;
+  --color-surface-container-low: #1c1b1b;
+  --color-on-secondary-container: #bab8b7;
+  --color-on-error: #690005;
+  --color-surface-tint: #c6c6c7;
+  --color-on-primary-container: #636565;
+  --color-on-tertiary-fixed-variant: #474746;
+  --color-on-surface-variant: #c4c7c8;
+  --color-primary-fixed: #e2e2e2;
+  --color-background: #131313;
+  --color-on-tertiary: #313030;
+  --color-on-primary: #2f3131;
+  --color-primary-fixed-dim: #c6c6c7;
+  --color-surface-container-highest: #353534;
+  --color-surface-container-lowest: #0e0e0e;
+  --color-inverse-surface: #e5e2e1;
+  --color-on-secondary-fixed: #1c1b1b;
+  --color-secondary-container: #4a4949;
+  --color-on-secondary-fixed-variant: #474646;
+  --color-on-background: #e5e2e1;
+  --color-on-secondary: #313030;
+  --color-inverse-on-surface: #313030;
+  --color-tertiary-fixed-dim: #c8c6c5;
+  --color-on-error-container: #ffdad6;
+  --color-inverse-primary: #5d5f5f;
+  --color-outline-variant: #444748;
+  --color-secondary: #c8c6c5;
+  --color-error: #ffb4ab;
+
+  /* Custom Spacing - Scaled down for 67% zoom feel */
+  --spacing-nav-rail-width: 64px;
+  --spacing-stack-md: 12px;
+  --spacing-margin-container: 16px;
+  --spacing-sidebar-width: 260px;
+  --spacing-stack-lg: 24px;
+  --spacing-stack-sm: 6px;
+  --spacing-gutter: 12px;
+
+  /* Custom Fonts */
+  --font-headline-lg-mobile: Geist, sans-serif;
+  --font-headline-md: Geist, sans-serif;
+  --font-label-sm: JetBrains Mono, monospace;
+  --font-body-md: Geist, sans-serif;
+  --font-headline-lg: Geist, sans-serif;
+  --font-body-lg: Geist, sans-serif;
+
+  /* Custom Text Sizes - Scaled down */
+  --text-headline-lg-mobile: 20px;
+  --text-headline-md: 16px;
+  --text-label-sm: 11px;
+  --text-body-md: 13px;
+  --text-headline-lg: 24px;
+  --text-body-lg: 14px;
 }
 
 @layer base {
-  :root {
-    --background: #f5f5f7;
-    --foreground: #1d1d1f;
-    --primary: #007aff;
-    --surface: rgba(255, 255, 255, 0.7);
-    --surface-border: rgba(255, 255, 255, 0.4);
-  }
-
-  .dark {
-    --background: #000000;
-    --foreground: #f5f5f7;
-    --primary: #0a84ff;
-    --surface: rgba(28, 28, 30, 0.7);
-    --surface-border: rgba(255, 255, 255, 0.1);
-  }
-
   body {
-    background-color: var(--background);
-    color: var(--foreground);
-    /* Modern Apple-like typography */
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--color-background);
+    color: var(--color-on-background);
+    font-family: var(--font-body-md);
     transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  .light {
+    --color-background: #ffffff;
+    --color-surface: #ffffff;
+    --color-surface-container: #f5f5f7;
+    --color-surface-container-low: #fafafa;
+    --color-surface-container-lowest: #ffffff;
+    --color-surface-container-high: #e5e5e5;
+    --color-surface-variant: #e0e0e0;
+    --color-surface-dim: #f0f0f0;
+    --color-on-background: #111111;
+    --color-on-surface: #111111;
+    --color-on-surface-variant: #444444;
+    --color-primary: #007aff;
+    --color-outline-variant: #cccccc;
+    --color-outline: #888888;
   }
 }
 
 @layer utilities {
-  .glass {
-    background: var(--surface);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid var(--surface-border);
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 24px;  /* Preferred icon size */
+    display: inline-block;
+    line-height: 1;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr;
+    -webkit-font-smoothing: antialiased;
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+  }
+
+  .icon-filled {
+    font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+  }
+
+  /* Minimalist Scrollbar */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-surface-variant);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-outline-variant);
   }
 }

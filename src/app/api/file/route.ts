@@ -1,7 +1,7 @@
 import { ApiError } from "@/lib/utils/ApiError";
 import { asyncHandler } from "@/lib/utils/asyncHandler";
 import { readFile } from "fs/promises";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { join } from "path";
 
 export const GET = asyncHandler(async (request: Request) => {
