@@ -39,3 +39,6 @@ updated src/components/chat/ChatWindow.tsx : #L1-247
 updated src/app/api/upload/route.ts : #L1-37
 updated src/db/sqlite.ts : #L1-192
 created src/app/api/debug-pair/route.ts : #L1-17
+updated server.ts : added clipboard:sync socket listener
+created src/hooks/useClipboardSync.ts : implemented navigator.clipboard interactions and socket events
+updated src/components/chat/ChatWindow.tsx : added clipboard sync UI and hook integration
