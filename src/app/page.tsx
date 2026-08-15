@@ -1,30 +1,71 @@
 "use client";
 
-import { useState } from "react";
-import DeviceManager from "@/components/devices/DeviceManager";
-import ChatWindow from "@/components/chat/ChatWindow";
+import React from "react";
+import QRGenerator from "@/components/pairing/QRgenerator";
+import { Button } from "@/components/ui/Button";
+import { ArrowRight, Smartphone, ShieldCheck, Activity } from "lucide-react";
+import { useRouter } from "next/navigation";
 
-
-export default function Home() {
-  const [selectedDevice, setSelectedDevice] = useState<{ id: string; name: string } | null>(null);
+export default function Dashboard() {
+  const router = useRouter();
 
   return (
-    <div className="flex h-screen bg-zinc-50 dark:bg-zinc-950 font-sans">
-      {/* Sidebar: Device Management */}
-      <div className="w-1/3 max-w-sm border-r border-zinc-200 dark:border-zinc-800 p-6 overflow-y-auto">
-        <h1 className="text-2xl font-bold mb-8 text-zinc-900 dark:text-zinc-50">Simplify-Sync</h1>
-        <DeviceManager onSelectDevice={(id, name) => setSelectedDevice({ id, name })} />
+    <div className="h-full flex flex-col gap-6 p-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Overview</h1>
+        <Button onClick={() => router.push("/devices")} variant="primary">
+          Manage Devices <ArrowRight size={18} />
+        </Button>
       </div>
 
-      {/* Main Content: Chat Window */}
-      <div className="flex-1 p-6 relative">
-        {selectedDevice ? (
-          <ChatWindow deviceId={selectedDevice.id} deviceName={selectedDevice.name} />
-        ) : (
-          <div className="h-full flex items-center justify-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">
-            <p className="text-zinc-500">Select a device from the sidebar to start messaging.</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+        {/* Pairing Card */}
+        <div className="lg:col-span-2 glass rounded-2xl p-8 flex flex-col items-center justify-center text-center shadow-lg relative overflow-hidden">
+          <div className="absolute -top-32 -right-32 w-64 h-64 bg-[var(--primary)]/20 blur-3xl rounded-full"></div>
+          <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-purple-500/20 blur-3xl rounded-full"></div>
+          
+          <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-gray-100 relative z-10">Connect New Device</h2>
+          <p className="text-gray-500 mb-8 relative z-10 max-w-md">
+            Scan the QR code below with your mobile device to establish a secure, local peer-to-peer connection.
+          </p>
+          
+          <div className="p-4 bg-white rounded-2xl shadow-sm relative z-10">
+            <QRGenerator />
           </div>
-        )}
+        </div>
+
+        {/* Stats Column */}
+        <div className="flex flex-col gap-6">
+          <div className="glass rounded-2xl p-6 shadow-sm flex items-start gap-4">
+            <div className="p-3 bg-green-500/10 text-green-600 rounded-xl">
+              <ShieldCheck size={28} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 font-medium">Security</p>
+              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">E2E Ready</h3>
+            </div>
+          </div>
+          
+          <div className="glass rounded-2xl p-6 shadow-sm flex items-start gap-4">
+            <div className="p-3 bg-[var(--primary)]/10 text-[var(--primary)] rounded-xl">
+              <Activity size={28} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 font-medium">Network Protocol</p>
+              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">Socket.io + UDP</h3>
+            </div>
+          </div>
+
+          <div className="glass rounded-2xl p-6 shadow-sm flex items-start gap-4 flex-1">
+            <div className="p-3 bg-purple-500/10 text-purple-500 rounded-xl">
+              <Smartphone size={28} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 font-medium">Active Sessions</p>
+              <h3 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mt-1">1</h3>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

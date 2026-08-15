@@ -35,6 +35,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       socket = io(); // Automatically connects to the current host
       
       socket.on('receive_message', (message: ChatMessage) => {
+        if(!message) return;
         const { activeDeviceId, messages } = get();
         // Append only if the message belongs to the currently viewed chat
         if (message.device_id === activeDeviceId) {

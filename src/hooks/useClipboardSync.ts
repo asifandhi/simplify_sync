@@ -15,6 +15,7 @@ export const useClipboardSync = (socket: Socket | null, targetDeviceId: string |
     const handleReceive = async (payload: ClipboardPayload) => {
       try {
         // Browsers require the document to be focused to write to the clipboard natively
+        if(!payload) return;
         if (document.hasFocus()) {
           await navigator.clipboard.writeText(payload.data);
           console.log('[Clipboard] Synced from peer');

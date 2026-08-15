@@ -42,3 +42,6 @@ created src/app/api/debug-pair/route.ts : #L1-17
 updated server.ts : added clipboard:sync socket listener
 created src/hooks/useClipboardSync.ts : implemented navigator.clipboard interactions and socket events
 updated src/components/chat/ChatWindow.tsx : added clipboard sync UI and hook integration
+created src/store/settingsStore.ts : added settings state management
+created src/app/api/settings/route.ts : implemented settings persistence in sqlite
+created src/app/settings/page.tsx : built user settings ui

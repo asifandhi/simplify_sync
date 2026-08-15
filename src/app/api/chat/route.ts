@@ -10,5 +10,5 @@ export async function GET(request: Request) {
     return ApiResponse.error("Device not found", 404);
   }
   const chatHistory = getChatByDeviceId(device_id) || [];
-  return NextResponse.json({ messages: chatHistory.reverse() });
+  return ApiResponse.success({ messages: chatHistory.reverse() });
 }
