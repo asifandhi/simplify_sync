@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { useSocket } from '@/hooks/useSocket'; // We will build this in Phase 3
-import { Button } from '@/components/ui/Button'; // We will build this in Phase 6
+import { useSocket } from '@/hooks/useSocket';
 
 interface PairingRequest {
   device_id: string;
@@ -12,29 +11,23 @@ interface PairingRequest {
 
 export default function PairingCheckingModal() {
   const [request, setRequest] = useState<PairingRequest | null>(null);
-  
-  // Note: For now this is just a placeholder hook call. 
-  // It will actually work once we build Phase 3!
-  // const socket = useSocket(); 
-  
+  const socket = useSocket();
+
   useEffect(() => {
-    // This is where we will listen to the Socket.io 'pairing_request' event.
-    // For now, we will simulate it NOT happening until Phase 3.
-    
-    /* 
-    if (socket) {
-      socket.on('pairing_request', (data: PairingRequest) => {
-        setRequest(data);
-        
-        // Auto-dismiss after 30 seconds
-        setTimeout(() => setRequest(null), 30000);
-      });
-    }
+    if (!socket) return;
+
+    const handlePairingRequest = (data: PairingRequest) => {
+      setRequest(data);
+      // Auto-dismiss after 30 seconds
+      setTimeout(() => setRequest(null), 30000);
+    };
+
+    socket.on('pairing_request', handlePairingRequest);
+
     return () => {
-      if (socket) socket.off('pairing_request');
-    }
-    */
-  }, []);
+      socket.off('pairing_request', handlePairingRequest);
+    };
+  }, [socket]);
 
   const handlePair = async () => {
     // In Phase 2, the DB already saved the device during the API handshake.

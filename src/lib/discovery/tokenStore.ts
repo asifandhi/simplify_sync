@@ -1,24 +1,36 @@
-// This holds our temporary pairing token in memory
-export const tokenStore = {
-  token: null as string | null,
-  expiresAt: 0,
+// Holds temporary pairing tokens in memory — supports multiple concurrent tokens
+// to avoid race conditions when multiple browser tabs generate QR codes.
 
+const tokens = new Map<string, number>(); // token → expiresAt timestamp
+
+export const tokenStore = {
   setToken(token: string, expiresInMs: number) {
-    this.token = token;
-    this.expiresAt = Date.now() + expiresInMs;
+    // Cleanup expired tokens on every new insert to prevent unbounded growth
+    const now = Date.now();
+    for (const [t, exp] of tokens) {
+      if (now > exp) tokens.delete(t);
+    }
+    tokens.set(token, now + expiresInMs);
   },
 
   isValid(tokenToTest: string): boolean {
-    if (!this.token || !this.expiresAt) return false;
-    if (Date.now() > this.expiresAt) {
-      this.token = null; // Clear expired token
+    const expiresAt = tokens.get(tokenToTest);
+    if (expiresAt === undefined) return false;
+    if (Date.now() > expiresAt) {
+      tokens.delete(tokenToTest); // Clear expired token
       return false;
     }
-    return this.token === tokenToTest;
+    return true;
+  },
+
+  /** Consume the token — single-use. Deletes it after successful validation. */
+  consume(tokenToTest: string): boolean {
+    if (!this.isValid(tokenToTest)) return false;
+    tokens.delete(tokenToTest);
+    return true;
   },
 
   clear() {
-    this.token = null;
-    this.expiresAt = 0;
+    tokens.clear();
   }
 };

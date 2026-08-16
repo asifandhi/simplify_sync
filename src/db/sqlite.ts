@@ -6,7 +6,7 @@ const db_path = process.env.DB_PATH || path.join(process.cwd(), "database", "Sim
 
 const db = new Database(db_path);
 
-connectDB();
+// connectDB() is called from server.ts — not at module level
 
 export function connectDB() {
   try {
@@ -32,7 +32,7 @@ export function connectDB() {
             timestamp     DATETIME DEFAULT CURRENT_TIMESTAMP,
             is_view_once  INTEGER DEFAULT 0,
             is_viewed     INTEGER DEFAULT 0,
-            FOREIGN KEY (device_id) REFERENCES devices(device_id) 
+            FOREIGN KEY (device_id) REFERENCES devices(device_id) ON DELETE CASCADE
         );
 
         CREATE TABLE IF NOT EXISTS settings (
@@ -182,6 +182,11 @@ export function insertDevice(data:DeviceInput) {
 }
 
 export function deleteDevice(deviceId: string) {
+  // Delete associated chat history first (also handled by CASCADE,
+  // but explicit delete ensures cleanup even if PRAGMA foreign_keys is OFF)
+  const delChat = db.prepare('DELETE FROM chat_history WHERE device_id = ?');
+  delChat.run(deviceId);
+
   const stmt = db.prepare('DELETE FROM devices WHERE device_id = ?');
   return stmt.run(deviceId);
 }

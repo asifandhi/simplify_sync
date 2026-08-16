@@ -14,7 +14,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
 
   fetchSettings: async () => {
     try {
-      const res = await axios.get('/api/settings');
+      const res = await axios.get('/api/setting');
       if (res.data.success) {
           // SQLite stores booleans as 1/0 or strings depending on implementation, handle coercions
         const ResponseClipboardState = res.data.data.clipboardSyncEnabled;
@@ -35,7 +35,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     set({ [key]: value });
     
     try {
-      await axios.post('/api/settings', { key, value: value.toString() });
+      await axios.post('/api/setting', { key, value: value.toString() });
     } catch (error) {
       console.error('[SettingsStore] Failed to update setting:', error);
       // Revert state if the network request fails

@@ -28,4 +28,4 @@
 - Initialized local SQLite database with `devices`, `chat_history`, and `settings` tables.
 - Implemented UDP broadcast for automatic local network discovery (`src/lib/discovery/udp.ts`).
 - Created dynamic Chat UI with TipTap formatting, drag-and-drop file support, and clipboard synchronization hooks.
-- Configured dynamic API routes for device pairing, message retrieval, and file uploads.
+- Configured dynamic API routes for device pairing, message retrieval, and file uploads.  

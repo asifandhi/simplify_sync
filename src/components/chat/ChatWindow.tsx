@@ -8,6 +8,17 @@ interface ChatWindowProps {
   deviceName: string;
 }
 
+/** Single-selector component — replaces 3 inline useChatStore calls with 1 subscription */
+function ConnectionBadge() {
+  const isConnected = useChatStore(s => s.isConnected);
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-[var(--color-on-surface)] font-label-sm text-[10px] tracking-wider uppercase border border-[var(--color-outline-variant)] flex items-center gap-1 ${isConnected ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+      <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+      {isConnected ? 'Connected' : 'Disconnected'}
+    </span>
+  );
+}
+
 function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
   const { messages, connectSocket, setMessages, sendMessage, socket } = useChatStore();
   const [input, setInput] = useState("");
@@ -166,10 +177,7 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
           <div>
             <h2 className="font-headline-md text-[var(--text-headline-md)] text-[var(--color-primary)] flex items-center gap-2">
               {deviceName}
-              <span className={`px-2 py-0.5 rounded-full text-[var(--color-on-surface)] font-label-sm text-[10px] tracking-wider uppercase border border-[var(--color-outline-variant)] flex items-center gap-1 ${useChatStore(s => s.isConnected) ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
-                <div className={`w-1.5 h-1.5 rounded-full ${useChatStore(s => s.isConnected) ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                {useChatStore(s => s.isConnected) ? 'Connected' : 'Disconnected'}
-              </span>
+              <ConnectionBadge />
             </h2>
             <p className="font-label-sm text-[var(--color-on-surface-variant)] text-[10px] mt-0.5 font-mono opacity-60">ID: {deviceId}</p>
           </div>

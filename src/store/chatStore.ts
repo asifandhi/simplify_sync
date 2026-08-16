@@ -64,7 +64,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       set({ socket });
     }
 
-    set({ activeDeviceId: deviceId });
+    // Clear stale messages when switching to a different device
+    const prevDeviceId = get().activeDeviceId;
+    if (prevDeviceId !== deviceId) {
+      set({ activeDeviceId: deviceId, messages: [] });
+    } else {
+      set({ activeDeviceId: deviceId });
+    }
 
     if (socket.connected) {
       socket.emit('register', deviceId);
