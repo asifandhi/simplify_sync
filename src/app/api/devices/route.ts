@@ -1,8 +1,9 @@
 import { getAllDevices } from "@/db/sqlite";
 import { ApiResponse } from "@/lib/utils/ApiResponse";
+import { asyncHandler } from "@/lib/utils/asyncHandler";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+export const GET = asyncHandler(async () => {
   try {
     const devices = await getAllDevices();
     return ApiResponse.success(devices, "Devices retrieved successfully");
@@ -10,4 +11,4 @@ export async function GET() {
     console.error("Error fetching devices:", error);
     return ApiResponse.error("Failed to fetch devices", 500);
   }
-}
+});
