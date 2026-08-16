@@ -19,7 +19,13 @@ app.prepare().then(() => {
 
   const server = createServer(async (req, res) => {
     try {
-      const parsedUrl = parse(req.url!, true);
+      const parsedUrl = new URL(req.url!, `http://${hostname}:${port}`);
+      
+      // Bypass Next.js for Socket.io routes so it doesn't return 404
+      if (parsedUrl.pathname?.startsWith('/socket.io')) {
+        return;
+      }
+      
       await handle(req, res, parsedUrl);
     } catch (error) {
       console.error("Error occurred handling", req.url, error);

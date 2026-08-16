@@ -15,6 +15,7 @@ export interface ChatMessage {
 
 interface ChatStore {
   socket: Socket | null;
+  isConnected: boolean;
   messages: ChatMessage[];
   activeDeviceId: string | null;
   connectSocket: (deviceId: string) => void;
@@ -25,29 +26,45 @@ interface ChatStore {
 
 export const useChatStore = create<ChatStore>((set, get) => ({
   socket: null,
+  isConnected: false,
   messages: [],
   activeDeviceId: null,
 
   connectSocket: (deviceId: string) => {
     let socket = get().socket;
     
-    if (!socket || !socket.connected) {
-      socket = io(); // Automatically connects to the current host
-      
+    if (!socket) {
+      socket = io(); // Connects to host
+
+      socket.on('connect', () => {
+        set({ isConnected: true });
+        const currentActive = get().activeDeviceId;
+        if (currentActive) {
+          socket?.emit('register', currentActive);
+        }
+      });
+
+      socket.on('disconnect', () => {
+        set({ isConnected: false });
+      });
+
       socket.on('receive_message', (message: ChatMessage) => {
-        if(!message) return;
+        if (!message) return;
         const { activeDeviceId, messages } = get();
-        // Append only if the message belongs to the currently viewed chat
-        if (message.device_id === activeDeviceId) {
+        // Append if message matches current active chat (or if sender is target device)
+        if (message.device_id === activeDeviceId || message.sender === activeDeviceId) {
           set({ messages: [...messages, message] });
         }
       });
-      
+
       set({ socket });
     }
-    
-    socket.emit('register', deviceId);
+
     set({ activeDeviceId: deviceId });
+
+    if (socket.connected) {
+      socket.emit('register', deviceId);
+    }
   },
 
   disconnectSocket: () => {
@@ -63,7 +80,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   sendMessage: (message) => {
     const { socket } = get();
     if (socket) {
+      console.log("[ChatStore] Emitting send_message:", message);
       socket.emit('send_message', message);
+    } else {
+      console.error("[ChatStore] Cannot send message: Socket is completely uninitialized.");
     }
   },
 }));

@@ -88,7 +88,7 @@ export default function SettingsPanel() {
           
           <div className="flex items-center justify-between py-4 border-b border-[var(--color-outline-variant)]/20">
             <div>
-              <p className="text-[var(--color-primary)] font-medium text-sm">Theme Appearance</p>
+              <p className="text-[var(--color-primary)]  font-medium text-sm">Theme Appearance</p>
               <p className="text-[var(--color-on-surface-variant)] text-xs mt-1">Toggle between dark and light modes.</p>
             </div>
             <button 

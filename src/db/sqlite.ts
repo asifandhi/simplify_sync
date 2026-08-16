@@ -160,6 +160,12 @@ export function getAllDevices() {
   const stmt = db.prepare('SELECT * FROM devices');
   return stmt.all();
 }
+export function getDeviceBySessionToken(session_token: string) {
+  const stmt = db.prepare('SELECT * FROM devices WHERE session_token = ?');
+  const result = stmt.get(session_token) as any;
+  return result;
+}
+
 interface DeviceInput {
   device_id: string;
   device_name: string;

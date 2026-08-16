@@ -5,10 +5,10 @@ import { getIO } from "@/lib/socket";
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const deviceId = params.id;
+    const { id: deviceId } = await params;
     deleteDevice(deviceId);
 
     try {
