@@ -24,17 +24,7 @@ export default function SettingsPanel() {
     }
   };
 
-  const toggleTheme = () => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(newTheme);
-    if (newTheme === 'light') {
-      document.documentElement.classList.remove('dark');
-      document.documentElement.classList.add('light');
-    } else {
-      document.documentElement.classList.remove('light');
-      document.documentElement.classList.add('dark');
-    }
-  };
+
 
   const handleToggleAutoSync = () => {
     if (!autoSyncClipboard) {
@@ -86,21 +76,6 @@ export default function SettingsPanel() {
         <section className="p-6 bg-[var(--color-surface-container)] rounded-2xl border border-[var(--color-outline-variant)]/30">
           <h3 className="text-[var(--text-headline-md)] text-[var(--color-primary)] font-headline-md mb-4">Preferences</h3>
           
-          <div className="flex items-center justify-between py-4 border-b border-[var(--color-outline-variant)]/20">
-            <div>
-              <p className="text-[var(--color-primary)]  font-medium text-sm">Theme Appearance</p>
-              <p className="text-[var(--color-on-surface-variant)] text-xs mt-1">Toggle between dark and light modes.</p>
-            </div>
-            <button 
-              onClick={toggleTheme}
-              className="flex items-center gap-2 px-3 py-1.5 bg-[var(--color-surface-variant)] hover:bg-[var(--color-outline-variant)] text-[var(--color-primary)] rounded-lg transition-colors text-sm font-medium border border-[var(--color-outline-variant)]/30"
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                {theme === 'dark' ? 'dark_mode' : 'light_mode'}
-              </span>
-              {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
-            </button>
-          </div>
 
           <div className="flex items-center justify-between py-4">
             <div>

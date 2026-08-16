@@ -193,7 +193,7 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
         {messages.map((msg, idx) => {
           const isMe = msg.sender === "me";
           return (
-            <div key={msg.id || idx} className={`flex flex-col max-w-[85%] md:max-w-[70%] gap-1 group ${isMe ? "self-end items-end" : "self-start"}`}>
+            <div key={msg.id ? `msg-${msg.id}` : `fallback-${idx}`} className={`flex flex-col max-w-[85%] md:max-w-[70%] gap-1 group ${isMe ? "self-end items-end" : "self-start"}`}>
               <div className={`p-4 rounded-2xl font-body-md leading-relaxed ${isMe ? "border border-[var(--color-outline-variant)]/50 bg-[var(--color-surface-container-lowest)] text-[var(--color-on-surface)] rounded-tr-sm shadow-sm" : "bg-[var(--color-surface-container-high)] text-[var(--color-primary)] rounded-tl-sm border border-transparent"}`}>
                 {renderBubbleContent(msg)}
               </div>

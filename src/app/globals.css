@@ -80,7 +80,6 @@
     background-color: var(--color-background);
     color: var(--color-on-background);
     font-family: var(--font-body-md);
-    transition: background-color 0.3s ease, color 0.3s ease;
   }
 
   .light {

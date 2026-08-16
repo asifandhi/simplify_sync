@@ -15,12 +15,22 @@ export function initSocket(server: HTTPServer) {
 
   io.use((socket, next) => {
     const sessionToken = socket.handshake.auth.session_token;
-    if (sessionToken) {
-      const device = getDeviceBySessionToken(sessionToken);
-      if (device) {
-        socket.data.device_id = device.device_id;
-      }
+
+    // Allow the PC web client to connect without a session token
+    // (it connects from the same origin — no device_id needed for web UI)
+    if (!sessionToken) {
+      // Web UI client — no device_id, but allowed to connect
+      return next();
     }
+
+    // Mobile client — must have a valid session token
+    const device = getDeviceBySessionToken(sessionToken);
+    if (!device) {
+      return next(new Error("Unauthorized: invalid session token"));
+    }
+
+    socket.data.device_id = device.device_id;
+    socket.data.authenticated = true;
     next();
   });
 
@@ -36,29 +46,37 @@ export function initSocket(server: HTTPServer) {
     });
 
     socket.on("send_message", (data) => {
-      // If the socket was authenticated via session_token, use its real device_id
+      // Determine the device_id:
+      // - Authenticated mobile clients: use socket.data.device_id (trusted, from DB)
+      // - Web UI clients: use data.device_id from payload (web UI is on the same host)
       const actualDeviceId = socket.data.device_id || data.device_id;
 
       if (!actualDeviceId) {
-        console.error("[Socket.io] Rejecting send_message: missing device_id in payload and unauthenticated");
+        console.error("[Socket.io] Rejecting send_message: no device_id available");
         return;
       }
 
-      console.log(`[Socket.io] Attempting to insert message for device_id: ${actualDeviceId}, sender: ${data.sender}`);
+      // Determine sender identity
+      const sender = socket.data.device_id
+        ? `android-${socket.data.device_id}`  // Mobile client — derive sender from auth
+        : (data.sender || "unknown");          // Web UI — trust payload sender field
+
+      console.log(`[Socket.io] Message for device_id: ${actualDeviceId}, sender: ${sender}`);
 
       // Persist message to SQLite
       const savedMessage = insertChatMessage({
         device_id: actualDeviceId,
-        sender: data.sender || (socket.data.device_id ? `android-${actualDeviceId}` : "unknown"),
-        content_type: data.content_type || "text",
+        sender,
+        content_type: data.content_type || data.contentType || "text",
         content: data.content,
-        file_path: data.file_path,
-        preview_data: data.preview_data,
-        is_view_once: data.is_view_once,
+        file_path: data.file_path || data.filePath,
+        preview_data: data.preview_data || data.previewData,
+        is_view_once: data.is_view_once || data.isViewOnce,
       });
 
-      // Broadcast to the target device's room
-      io.to(data.device_id).emit("receive_message", savedMessage);
+      // Broadcast to the target device's room (excluding sender)
+      socket.to(actualDeviceId).emit("receive_message", savedMessage);
+      // Send back to the sender
       socket.emit("receive_message", savedMessage);
     });
 
@@ -67,12 +85,16 @@ export function initSocket(server: HTTPServer) {
     });
 
     socket.on("clipboard:sync", (payload) => {
-  console.log(`[Socket] Clipboard sync from ${socket.id} to ${payload.targetDeviceId}`);
-  
-  if (payload.targetDeviceId) {
-    socket.to(payload.targetDeviceId).emit("clipboard:receive", payload);
-  }
-});
+      // Only allow clipboard sync from identified sockets (web UI registered or authenticated mobile)
+      if (!socket.data.device_id && !payload.senderDeviceId) {
+        console.warn("[Socket] Clipboard sync rejected: unidentified sender");
+        return;
+      }
+      console.log(`[Socket] Clipboard sync from ${socket.id} to ${payload.targetDeviceId}`);
+      if (payload.targetDeviceId) {
+        socket.to(payload.targetDeviceId).emit("clipboard:receive", payload);
+      }
+    });
   });
   console.log("> Socket.io server initialized");
 

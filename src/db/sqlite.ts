@@ -1,6 +1,8 @@
 import Database from "better-sqlite3";
+import path from "path";
 
-const db_path = process.env.DB_PATH;
+// Ensure we have a default path in case process.env is not fully loaded by Next.js yet
+const db_path = process.env.DB_PATH || path.join(process.cwd(), "database", "Simplify-Sync.db");
 
 const db = new Database(db_path);
 

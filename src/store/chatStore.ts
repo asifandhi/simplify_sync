@@ -53,6 +53,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         const { activeDeviceId, messages } = get();
         // Append if message matches current active chat (or if sender is target device)
         if (message.device_id === activeDeviceId || message.sender === activeDeviceId) {
+          // Prevent duplicates (e.g. from HMR or socket reconnect double-delivery)
+          if (message.id && messages.some((m) => m.id === message.id)) {
+             return;
+          }
           set({ messages: [...messages, message] });
         }
       });
