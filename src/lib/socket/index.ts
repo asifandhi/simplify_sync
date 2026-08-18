@@ -36,16 +36,22 @@ export function initSocket(server: HTTPServer) {
 
   io.on("connection", (socket: Socket) => {
     console.log(`[Socket.io] Client connected: ${socket.id}`);
+    
     // Join a room based on device_id for targeted messaging
+    // Mobile clients authenticate via middleware and have socket.data.device_id
+    if (socket.data.device_id) {
+      socket.join(socket.data.device_id);
+      console.log(`[Socket.io] ${socket.id} auto-joined room: ${socket.data.device_id}`);
+    }
     
     socket.on("register", (device_id: string) => {
+      // Web UI clients use this to subscribe to a specific device's events
       socket.join(device_id);
-      console.log(
-        `[Socket.io] ${socket.id} registered for device: ${device_id}`,
-      );
+      const rooms = Array.from(socket.rooms);
+      console.log(`[Socket.io] ${socket.id} registered for device: ${device_id} | All rooms: ${JSON.stringify(rooms)}`);
     });
 
-    socket.on("send_message", (data) => {
+    socket.on("send_message", async (data) => {
       // Determine the device_id:
       // - Authenticated mobile clients: use socket.data.device_id (trusted, from DB)
       // - Web UI clients: use data.device_id from payload (web UI is on the same host)
@@ -58,7 +64,7 @@ export function initSocket(server: HTTPServer) {
 
       // Determine sender identity
       const sender = socket.data.device_id
-        ? `android-${socket.data.device_id}`  // Mobile client — derive sender from auth
+        ? socket.data.device_id  // Mobile client — already prefixed 'android-...'
         : (data.sender || "unknown");          // Web UI — trust payload sender field
 
       console.log(`[Socket.io] Message for device_id: ${actualDeviceId}, sender: ${sender}`);
@@ -75,9 +81,15 @@ export function initSocket(server: HTTPServer) {
       });
 
       // Broadcast to the target device's room (excluding sender)
+      const roomSockets = await io.in(actualDeviceId).fetchSockets();
+      console.log(`[Socket.io] Broadcasting to room '${actualDeviceId}' — ${roomSockets.length} socket(s) in room: ${roomSockets.map(s => s.id).join(', ')}`);
       socket.to(actualDeviceId).emit("receive_message", savedMessage);
-      // Send back to the sender
-      socket.emit("receive_message", savedMessage);
+      
+      // Web UI sends messages without local persistence, so it needs an echo to render.
+      // Mobile clients save locally before sending, so we don't echo to prevent duplicates.
+      if (!socket.data.device_id) {
+        socket.emit("receive_message", savedMessage);
+      }
     });
 
     socket.on("disconnect", () => {

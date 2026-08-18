@@ -12,9 +12,8 @@ interface ChatWindowProps {
 function ConnectionBadge() {
   const isConnected = useChatStore(s => s.isConnected);
   return (
-    <span className={`px-2 py-0.5 rounded-full text-[var(--color-on-surface)] font-label-sm text-[10px] tracking-wider uppercase border border-[var(--color-outline-variant)] flex items-center gap-1 ${isConnected ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
-      <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-      {isConnected ? 'Connected' : 'Disconnected'}
+    <span className={` rounded-full text-[var(--color-on-surface)] font-label-sm text-[10px] tracking-wider uppercase border border-[var(--color-outline-variant)] flex items-center gap-1 ${isConnected ? 'bg-green-500/20  ' : 'bg-red-500/20  '}`}>
+    <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
     </span>
   );
 }
@@ -199,7 +198,9 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-[var(--spacing-margin-container)] flex flex-col gap-6 z-0 pb-32 custom-scrollbar" ref={scrollRef}>
         {messages.map((msg, idx) => {
-          const isMe = msg.sender === "me";
+          // 'me' = sent from this web UI
+          // anything else ('android-xxx', 'pc', etc.) = received from phone
+          const isMe = msg.sender === 'me';
           return (
             <div key={msg.id ? `msg-${msg.id}` : `fallback-${idx}`} className={`flex flex-col max-w-[85%] md:max-w-[70%] gap-1 group ${isMe ? "self-end items-end" : "self-start"}`}>
               <div className={`p-4 rounded-2xl font-body-md leading-relaxed ${isMe ? "border border-[var(--color-outline-variant)]/50 bg-[var(--color-surface-container-lowest)] text-[var(--color-on-surface)] rounded-tr-sm shadow-sm" : "bg-[var(--color-surface-container-high)] text-[var(--color-primary)] rounded-tl-sm border border-transparent"}`}>

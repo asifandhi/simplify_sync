@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { io, Socket } from 'socket.io-client';
-// @RTU
+
 export interface ChatMessage {
   id?: number;
   device_id: string;
@@ -32,12 +32,23 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   connectSocket: (deviceId: string) => {
     let socket = get().socket;
-    
+
+    // FIX: Set activeDeviceId BEFORE creating the socket so the on('connect')
+    // handler can read the correct deviceId when it fires during the async handshake.
+    const prevDeviceId = get().activeDeviceId;
+    if (prevDeviceId !== deviceId) {
+      set({ activeDeviceId: deviceId, messages: [] });
+    } else {
+      set({ activeDeviceId: deviceId });
+    }
+
     if (!socket) {
-      socket = io(); // Connects to host
+      socket = io();
 
       socket.on('connect', () => {
         set({ isConnected: true });
+        // activeDeviceId is already committed to the store above,
+        // so register fires with the correct room ID even on first connect.
         const currentActive = get().activeDeviceId;
         if (currentActive) {
           socket?.emit('register', currentActive);
@@ -51,27 +62,25 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       socket.on('receive_message', (message: ChatMessage) => {
         if (!message) return;
         const { activeDeviceId, messages } = get();
-        // Append if message matches current active chat (or if sender is target device)
-        if (message.device_id === activeDeviceId || message.sender === activeDeviceId) {
-          // Prevent duplicates (e.g. from HMR or socket reconnect double-delivery)
-          if (message.id && messages.some((m) => m.id === message.id)) {
-             return;
-          }
-          set({ messages: [...messages, message] });
-        }
+
+        // FIX: Only accept messages whose device_id matches the open chat thread.
+        // Do NOT filter on sender — the sender field is the android device id string,
+        // not "me", so previously messages from android matched activeDeviceId and
+        // appeared on the wrong (left) side.
+        if (message.device_id !== activeDeviceId) return;
+
+        // Prevent duplicates (e.g. from HMR or socket reconnect double-delivery)
+        if (message.id && messages.some((m) => m.id === message.id)) return;
+
+        set({ messages: [...messages, message] });
       });
 
       set({ socket });
     }
 
-    // Clear stale messages when switching to a different device
-    const prevDeviceId = get().activeDeviceId;
-    if (prevDeviceId !== deviceId) {
-      set({ activeDeviceId: deviceId, messages: [] });
-    } else {
-      set({ activeDeviceId: deviceId });
-    }
-
+    // If already connected (e.g. switching between devices), register immediately.
+    // If not yet connected, the on('connect') handler above fires once the
+    // async handshake completes and will call register at that point.
     if (socket.connected) {
       socket.emit('register', deviceId);
     }
@@ -90,10 +99,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   sendMessage: (message) => {
     const { socket } = get();
     if (socket) {
-      console.log("[ChatStore] Emitting send_message:", message);
+      console.log('[ChatStore] Emitting send_message:', message);
       socket.emit('send_message', message);
     } else {
-      console.error("[ChatStore] Cannot send message: Socket is completely uninitialized.");
+      console.error('[ChatStore] Cannot send message: Socket is completely uninitialized.');
     }
   },
 }));
