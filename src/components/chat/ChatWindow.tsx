@@ -2,28 +2,25 @@ import { useChatStore } from "@/store/chatStore";
 import axios from "axios";
 import React, { useEffect, useRef, useState } from "react";
 import { useClipboardSync } from "@/hooks/useClipboardSync";
+import { isContext } from "vm";
+import { Divide } from "lucide-react";
 
 interface ChatWindowProps {
   deviceId: string;
   deviceName: string;
 }
 
-/** Single-selector component — replaces 3 inline useChatStore calls with 1 subscription */
-function ConnectionBadge() {
-  const isConnected = useChatStore(s => s.isConnected);
-  return (
-    <span className={` rounded-full text-[var(--color-on-surface)] font-label-sm text-[10px] tracking-wider uppercase border border-[var(--color-outline-variant)] flex items-center gap-1 ${isConnected ? 'bg-green-500/20  ' : 'bg-red-500/20  '}`}>
-    <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-    </span>
-  );
-}
-
 function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
-  const { messages, connectSocket, setMessages, sendMessage, socket } = useChatStore();
+  const { isDeviceOnline, isChatOpen } = useChatStore((s) => ({
+    isDeviceOnline: s.isDeviceOnline,
+    isChatOpen: s.isChatOpen,
+  }));
+  const { messages, connectSocket, setMessages, sendMessage, socket } =
+    useChatStore();
   const [input, setInput] = useState("");
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  
+
   const { syncLocalClipboard, error } = useClipboardSync(socket, deviceId);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -170,40 +167,63 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
       {/* Header */}
       <header className="h-20 px-[var(--spacing-margin-container)] flex items-center justify-between border-b border-[var(--color-outline-variant)]/30 bg-[var(--color-background)]/80 backdrop-blur-md z-10 shrink-0">
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full border border-[var(--color-outline-variant)] flex items-center justify-center font-headline-md text-[var(--color-on-surface)] bg-[var(--color-surface-variant)] hidden md:flex">
-            {deviceName.charAt(0).toUpperCase()}
+          <div className="relative shrink-0">
+            <div className="w-10 h-10 rounded-full border border-[var(--color-outline-variant)] flex items-center justify-center font-headline-md text-[var(--color-on-surface)] bg-[var(--color-surface-variant)] hidden md:flex">
+              {deviceName.charAt(0).toUpperCase()}
+            </div>
+            {isDeviceOnline && (
+              <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[var(--color-background)] ${isChatOpen ? "bg-green-500" : "bg-blue-500"}`}></div>
+            )}
           </div>
           <div>
             <h2 className="font-headline-md text-[var(--text-headline-md)] text-[var(--color-primary)] flex items-center gap-2">
               {deviceName}
-              <ConnectionBadge />
             </h2>
-            <p className="font-label-sm text-[var(--color-on-surface-variant)] text-[10px] mt-0.5 font-mono opacity-60">ID: {deviceId}</p>
+            
+            <p className="font-label-sm text-[var(--color-on-surface-variant)] text-[10px] mt-0.5 font-mono opacity-60">
+              ID: {deviceId}
+            </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          {error && <span className="text-xs text-[var(--color-error)] font-medium mr-2">{error}</span>}
+          {error && (
+            <span className="text-xs text-[var(--color-error)] font-medium mr-2">
+              {error}
+            </span>
+          )}
           <button
             onClick={syncLocalClipboard}
             className="h-10 px-4 rounded-full flex items-center justify-center gap-2 text-[var(--color-primary)] bg-[var(--color-surface-container)] hover:bg-[var(--color-surface-container-high)] transition-colors border border-[var(--color-outline-variant)]/50"
             title="Push local clipboard to this device"
           >
-            <span className="material-symbols-outlined text-[18px]">content_copy</span>
-            <span className="text-sm font-medium hidden sm:block">Sync Clipboard</span>
+            <span className="material-symbols-outlined text-[18px]">
+              content_copy
+            </span>
+            <span className="text-sm font-medium hidden sm:block">
+              Sync Clipboard
+            </span>
           </button>
         </div>
       </header>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-[var(--spacing-margin-container)] flex flex-col gap-6 z-0 pb-32 custom-scrollbar" ref={scrollRef}>
+      <div
+        className="flex-1 overflow-y-auto p-[var(--spacing-margin-container)] flex flex-col gap-6 z-0 pb-32 custom-scrollbar"
+        ref={scrollRef}
+      >
         {messages.map((msg, idx) => {
           // 'me' = sent from this web UI
           // anything else ('android-xxx', 'pc', etc.) = received from phone
-          const isMe = msg.sender === 'me';
+          const isMe = msg.sender === "me";
           return (
-            <div key={msg.id ? `msg-${msg.id}` : `fallback-${idx}`} className={`flex flex-col max-w-[85%] md:max-w-[70%] gap-1 group ${isMe ? "self-end items-end" : "self-start"}`}>
-              <div className={`p-4 rounded-2xl font-body-md leading-relaxed ${isMe ? "border border-[var(--color-outline-variant)]/50 bg-[var(--color-surface-container-lowest)] text-[var(--color-on-surface)] rounded-tr-sm shadow-sm" : "bg-[var(--color-surface-container-high)] text-[var(--color-primary)] rounded-tl-sm border border-transparent"}`}>
+            <div
+              key={msg.id ? `msg-${msg.id}` : `fallback-${idx}`}
+              className={`flex flex-col max-w-[85%] md:max-w-[70%] gap-1 group ${isMe ? "self-end items-end" : "self-start"}`}
+            >
+              <div
+                className={`p-4 rounded-2xl font-body-md leading-relaxed ${isMe ? "border border-[var(--color-outline-variant)]/50 bg-[var(--color-surface-container-lowest)] text-[var(--color-on-surface)] rounded-tr-sm shadow-sm" : "bg-[var(--color-surface-container-high)] text-[var(--color-primary)] rounded-tl-sm border border-transparent"}`}
+              >
                 {renderBubbleContent(msg)}
               </div>
             </div>
@@ -213,7 +233,10 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
 
       {/* Input Area */}
       <div className="absolute bottom-0 left-0 right-0 p-[var(--spacing-margin-container)] pt-4 bg-gradient-to-t from-[var(--color-background)] via-[var(--color-background)] to-transparent z-20">
-        <form onSubmit={handleSendText} className="max-w-4xl mx-auto flex items-end gap-2 bg-[var(--color-surface-container)] border border-[var(--color-outline-variant)]/50 p-2 rounded-2xl focus-within:border-[var(--color-outline-variant)] transition-all">
+        <form
+          onSubmit={handleSendText}
+          className="max-w-4xl mx-auto flex items-end gap-2 bg-[var(--color-surface-container)] border border-[var(--color-outline-variant)]/50 p-2 rounded-2xl focus-within:border-[var(--color-outline-variant)] transition-all"
+        >
           <input
             type="file"
             ref={fileInputRef}
@@ -228,29 +251,29 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
           >
             <span className="material-symbols-outlined">attach_file</span>
           </button>
-          
-          <textarea 
-            className="flex-1 max-h-32 min-h-10 bg-transparent border-none focus:ring-0 text-[var(--color-primary)] font-body-md placeholder:text-[var(--color-on-surface-variant)] resize-none py-2 px-2 overflow-y-auto custom-scrollbar outline-none" 
+
+          <textarea
+            className="flex-1 max-h-32 min-h-10 bg-transparent border-none focus:ring-0 text-[var(--color-primary)] font-body-md placeholder:text-[var(--color-on-surface-variant)] resize-none py-2 px-2 overflow-y-auto custom-scrollbar outline-none"
             onInput={(e) => {
-               const target = e.target as HTMLTextAreaElement;
-               target.style.height = ''; 
-               target.style.height = target.scrollHeight + 'px';
-            }} 
+              const target = e.target as HTMLTextAreaElement;
+              target.style.height = "";
+              target.style.height = target.scrollHeight + "px";
+            }}
             value={uploading ? "Uploading file..." : input}
             disabled={uploading}
             onChange={(e) => setInput(e.target.value)}
             onPaste={handlePaste}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 handleSendText(e as any);
               }
             }}
-            placeholder="Type a message..." 
+            placeholder="Type a message..."
             rows={1}
           />
 
-          <button 
+          <button
             type="submit"
             disabled={uploading}
             className="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-[var(--color-primary)] bg-[var(--color-surface-variant)] hover:bg-[var(--color-outline-variant)] transition-colors disabled:opacity-50"

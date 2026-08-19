@@ -44,9 +44,6 @@ export default function DeviceCard({ device, isActive, onClick }: Props) {
           }`}>
             {device.device_name.charAt(0).toUpperCase()}
           </div>
-          {isActive && (
-            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[var(--color-primary)] rounded-full border-2 border-[var(--color-surface-container-high)]"></div>
-          )}
         </div>
 
         {/* Text Details */}

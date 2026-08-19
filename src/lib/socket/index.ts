@@ -5,6 +5,10 @@ import { Server, Socket } from "socket.io";
 
 let io: Server;
 
+// Track active mobile connections to provide presence status
+const activeMobileSockets = new Map<string, number>();
+const deviceChatState = new Map<string, boolean>();
+
 export function initSocket(server: HTTPServer) {
   io = new Server(server, {
     cors: {
@@ -37,18 +41,41 @@ export function initSocket(server: HTTPServer) {
   io.on("connection", (socket: Socket) => {
     console.log(`[Socket.io] Client connected: ${socket.id}`);
     
-    // Join a room based on device_id for targeted messaging
     // Mobile clients authenticate via middleware and have socket.data.device_id
     if (socket.data.device_id) {
-      socket.join(socket.data.device_id);
-      console.log(`[Socket.io] ${socket.id} auto-joined room: ${socket.data.device_id}`);
+      const devId = socket.data.device_id;
+      socket.join(devId);
+      
+      const count = activeMobileSockets.get(devId) || 0;
+      activeMobileSockets.set(devId, count + 1);
+      if (count === 0) {
+        const isChatOpen = deviceChatState.get(devId) || false;
+        console.log(`[Presence] Broadcasting online:true to room ${devId}`);
+        io.to(devId).emit("device_presence", { online: true, is_chat_open: isChatOpen });
+      }
+      console.log(`[Socket.io] ${socket.id} auto-joined room: ${devId} | Active connections: ${count + 1}`);
     }
     
+    socket.on("chat_state", (data: { is_open: boolean }) => {
+      if (socket.data.device_id) {
+        const devId = socket.data.device_id;
+        deviceChatState.set(devId, data.is_open);
+        console.log(`[Presence] Device ${devId} chat is_open:${data.is_open}`);
+        io.to(devId).emit("device_presence", { online: true, is_chat_open: data.is_open });
+      }
+    });
+
     socket.on("register", (device_id: string) => {
       // Web UI clients use this to subscribe to a specific device's events
       socket.join(device_id);
       const rooms = Array.from(socket.rooms);
       console.log(`[Socket.io] ${socket.id} registered for device: ${device_id} | All rooms: ${JSON.stringify(rooms)}`);
+      
+      // Instantly reply with current presence status
+      const isOnline = (activeMobileSockets.get(device_id) || 0) > 0;
+      const isChatOpen = deviceChatState.get(device_id) || false;
+      console.log(`[Presence] Register request for ${device_id}. Responding with online:${isOnline}, is_chat_open:${isChatOpen}`);
+      socket.emit("device_presence", { online: isOnline, is_chat_open: isChatOpen });
     });
 
     socket.on("send_message", async (data) => {
@@ -94,6 +121,20 @@ export function initSocket(server: HTTPServer) {
 
     socket.on("disconnect", () => {
       console.log(`[Socket.io] Client disconnected: ${socket.id}`);
+      
+      if (socket.data.device_id) {
+        const devId = socket.data.device_id;
+        const count = activeMobileSockets.get(devId) || 1;
+        if (count <= 1) {
+          activeMobileSockets.delete(devId);
+          deviceChatState.set(devId, false); // Reset chat state on disconnect
+          console.log(`[Presence] Broadcasting online:false to room ${devId}`);
+          io.to(devId).emit("device_presence", { online: false, is_chat_open: false });
+          console.log(`[Socket.io] Device ${devId} is now offline.`);
+        } else {
+          activeMobileSockets.set(devId, count - 1);
+        }
+      }
     });
 
     socket.on("clipboard:sync", (payload) => {

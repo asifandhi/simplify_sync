@@ -16,6 +16,8 @@ export interface ChatMessage {
 interface ChatStore {
   socket: Socket | null;
   isConnected: boolean;
+  isDeviceOnline: boolean;
+  isChatOpen: boolean;
   messages: ChatMessage[];
   activeDeviceId: string | null;
   connectSocket: (deviceId: string) => void;
@@ -27,6 +29,8 @@ interface ChatStore {
 export const useChatStore = create<ChatStore>((set, get) => ({
   socket: null,
   isConnected: false,
+  isDeviceOnline: false,
+  isChatOpen: false,
   messages: [],
   activeDeviceId: null,
 
@@ -37,7 +41,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     // handler can read the correct deviceId when it fires during the async handshake.
     const prevDeviceId = get().activeDeviceId;
     if (prevDeviceId !== deviceId) {
-      set({ activeDeviceId: deviceId, messages: [] });
+      set({ activeDeviceId: deviceId, messages: [], isDeviceOnline: false, isChatOpen: false });
     } else {
       set({ activeDeviceId: deviceId });
     }
@@ -56,7 +60,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       });
 
       socket.on('disconnect', () => {
-        set({ isConnected: false });
+        set({ isConnected: false, isDeviceOnline: false, isChatOpen: false });
+      });
+
+      socket.on('device_presence', (data: { online: boolean; is_chat_open?: boolean }) => {
+        console.log(`[ChatStore] Received device_presence:`, data);
+        set({ isDeviceOnline: data.online, isChatOpen: !!data.is_chat_open });
       });
 
       socket.on('receive_message', (message: ChatMessage) => {
@@ -91,7 +100,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     if (socket) {
       socket.disconnect();
     }
-    set({ socket: null, activeDeviceId: null, messages: [] });
+    set({ socket: null, activeDeviceId: null, messages: [], isDeviceOnline: false, isChatOpen: false });
   },
 
   setMessages: (messages) => set({ messages }),
