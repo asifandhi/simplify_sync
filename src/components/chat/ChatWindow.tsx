@@ -11,10 +11,8 @@ interface ChatWindowProps {
 }
 
 function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
-  const { isDeviceOnline, isChatOpen } = useChatStore((s) => ({
-    isDeviceOnline: s.isDeviceOnline,
-    isChatOpen: s.isChatOpen,
-  }));
+  const isDeviceOnline = useChatStore((s) => s.isDeviceOnline);
+  const isChatOpen = useChatStore((s) => s.isChatOpen);
   const { messages, connectSocket, setMessages, sendMessage, socket } =
     useChatStore();
   const [input, setInput] = useState("");
