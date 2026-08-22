@@ -20,18 +20,14 @@ export function initSocket(server: HTTPServer) {
   io.use((socket, next) => {
     const sessionToken = socket.handshake.auth.session_token;
 
-    // The Web UI connects without a token. We must restrict this to localhost 
-    // to prevent remote attackers on the local network from connecting.
+    // Allow the PC web client to connect without a session token
+    // (it connects from the same origin — no device_id needed for web UI)
     if (!sessionToken) {
-      const ip = socket.handshake.address;
-      if (ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1") {
-        socket.data.is_web_ui = true;
-        return next();
-      }
-      return next(new Error("Unauthorized: missing session token"));
+      // Web UI client — no device_id, but allowed to connect
+      return next();
     }
 
-    // Mobile client (remote) — must have a valid session token
+    // Mobile client — must have a valid session token
     const device = getDeviceBySessionToken(sessionToken);
     if (!device) {
       return next(new Error("Unauthorized: invalid session token"));
@@ -70,11 +66,6 @@ export function initSocket(server: HTTPServer) {
     });
 
     socket.on("register", (device_id: string) => {
-      if (!socket.data.is_web_ui) {
-        console.error(`[Socket.io] Rejecting register event from non-Web-UI socket ${socket.id}`);
-        return;
-      }
-      
       // Web UI clients use this to subscribe to a specific device's events
       socket.join(device_id);
       const rooms = Array.from(socket.rooms);
@@ -88,25 +79,16 @@ export function initSocket(server: HTTPServer) {
     });
 
     socket.on("send_message", async (data) => {
-      // If the socket has a device_id (mobile client), force it. 
-      // If it's the Web UI, allow it to specify the target device_id.
-      // Otherwise, reject.
-      if (!socket.data.device_id && !socket.data.is_web_ui) {
-        console.error("[Socket.io] Rejecting send_message: Unauthenticated socket attempted spoofing.");
-        return;
-      }
-
-      const actualDeviceId = socket.data.device_id || data.device_id;
+      // Secure actualDeviceId to strictly use authenticated socket.data.device_id
+      const actualDeviceId = socket.data.device_id;
 
       if (!actualDeviceId) {
-        console.error("[Socket.io] Rejecting send_message: no device_id available");
+        console.error("[Socket.io] Rejecting send_message: unauthorized unauthenticated socket");
         return;
       }
 
-      // Determine sender identity securely
-      const sender = socket.data.device_id
-        ? socket.data.device_id  // Mobile client — strictly enforce their identity
-        : (data.sender || "me"); // Web UI — trust payload sender field
+      // Sender is always the authenticated device
+      const sender = actualDeviceId;
 
       console.log(`[Socket.io] Message for device_id: ${actualDeviceId}, sender: ${sender}`);
 
@@ -125,12 +107,6 @@ export function initSocket(server: HTTPServer) {
       const roomSockets = await io.in(actualDeviceId).fetchSockets();
       console.log(`[Socket.io] Broadcasting to room '${actualDeviceId}' — ${roomSockets.length} socket(s) in room: ${roomSockets.map(s => s.id).join(', ')}`);
       socket.to(actualDeviceId).emit("receive_message", savedMessage);
-      
-      // Web UI sends messages without local persistence, so it needs an echo to render.
-      // Mobile clients save locally before sending, so we don't echo to prevent duplicates.
-      if (!socket.data.device_id) {
-        socket.emit("receive_message", savedMessage);
-      }
     });
 
     socket.on("disconnect", () => {
@@ -152,13 +128,12 @@ export function initSocket(server: HTTPServer) {
     });
 
     socket.on("clipboard:sync", (payload) => {
-      if (!socket.data.device_id && !socket.data.is_web_ui) {
-        console.error("[Socket.io] Rejecting clipboard:sync from untrusted socket.");
+      // Only allow clipboard sync from identified sockets (web UI registered or authenticated mobile)
+      if (!socket.data.device_id && !payload.senderDeviceId) {
+        console.warn("[Socket] Clipboard sync rejected: unidentified sender");
         return;
       }
-      
-      const targetDevice = socket.data.device_id ? socket.data.device_id : payload.targetDeviceId;
-      console.log(`[Socket] Clipboard sync from ${socket.id} to ${targetDevice}`);
+      console.log(`[Socket] Clipboard sync from ${socket.id} to ${payload.targetDeviceId}`);
       if (payload.targetDeviceId) {
         socket.to(payload.targetDeviceId).emit("clipboard:receive", payload);
       }

@@ -105,13 +105,29 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   setMessages: (messages) => set({ messages }),
 
-  sendMessage: (message) => {
-    const { socket } = get();
-    if (socket) {
-      console.log('[ChatStore] Emitting send_message:', message);
-      socket.emit('send_message', message);
-    } else {
-      console.error('[ChatStore] Cannot send message: Socket is completely uninitialized.');
+  sendMessage: async (message) => {
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(message)
+      });
+      const result = await response.json();
+      
+      if (result.success) {
+        // Echo the message back to the UI instantly since it was successfully saved
+        const { messages, activeDeviceId } = get();
+        if (message.device_id === activeDeviceId) {
+          // Prevent duplicates if socket happens to bounce it back
+          if (!messages.some((m) => m.id === result.data.id)) {
+            set({ messages: [...messages, result.data] });
+          }
+        }
+      } else {
+        console.error('[ChatStore] Failed to send message via API:', result.error);
+      }
+    } catch (err) {
+      console.error('[ChatStore] Error sending message via API:', err);
     }
   },
 }));
