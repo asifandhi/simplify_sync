@@ -128,15 +128,21 @@ export function initSocket(server: HTTPServer) {
     });
 
     socket.on("clipboard:sync", (payload) => {
-      // Only allow clipboard sync from identified sockets (web UI registered or authenticated mobile)
-      if (!socket.data.device_id && !payload.senderDeviceId) {
-        console.warn("[Socket] Clipboard sync rejected: unidentified sender");
+      // Only allow authenticated sockets to emit clipboard:sync
+      const actualDeviceId = socket.data.device_id;
+      if (!actualDeviceId) {
+        console.warn("[Socket] Clipboard sync rejected: unauthorized unauthenticated socket");
         return;
       }
-      console.log(`[Socket] Clipboard sync from ${socket.id} to ${payload.targetDeviceId}`);
-      if (payload.targetDeviceId) {
-        socket.to(payload.targetDeviceId).emit("clipboard:receive", payload);
+      
+      // Verify pairing: Mobile device can only sync to its own room
+      if (actualDeviceId !== payload.targetDeviceId) {
+        console.warn(`[Socket] Clipboard sync rejected: sender ${actualDeviceId} is not paired with target ${payload.targetDeviceId}`);
+        return;
       }
+
+      console.log(`[Socket] Clipboard sync from ${socket.id} to ${payload.targetDeviceId}`);
+      socket.to(payload.targetDeviceId).emit("clipboard:receive", payload);
     });
   });
   console.log("> Socket.io server initialized");

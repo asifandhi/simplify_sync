@@ -207,7 +207,8 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
 
       {/* Messages Area */}
       <div
-        className="flex-1 overflow-y-auto p-[var(--spacing-margin-container)] flex flex-col gap-6 z-0 pb-32 custom-scrollbar"
+        className="flex-1 overflow-y-auto p-[var(--spacing-margin-container)] flex flex-col gap-6 z-0 pb-32 custom-scrollbar relative bg-[url('/chat-bg-dark.png')] [.light_&]:bg-[url('/chat-bg.png')]"
+        style={{ backgroundSize: '400px', backgroundRepeat: 'repeat' }}
         ref={scrollRef}
       >
         {messages.map((msg, idx) => {
@@ -233,7 +234,7 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
       <div className="absolute bottom-0 left-0 right-0 p-[var(--spacing-margin-container)] pt-4 bg-gradient-to-t from-[var(--color-background)] via-[var(--color-background)] to-transparent z-20">
         <form
           onSubmit={handleSendText}
-          className="max-w-4xl mx-auto flex items-end gap-2 bg-[var(--color-surface-container)] border border-[var(--color-outline-variant)]/50 p-2 rounded-2xl focus-within:border-[var(--color-outline-variant)] transition-all"
+          className="max-w-full mx-auto flex items-end gap-2 bg-[var(--color-surface-container)] border border-[var(--color-outline-variant)]/50 p-2 rounded-2xl focus-within:border-[var(--color-outline-variant)] transition-all"
         >
           <input
             type="file"

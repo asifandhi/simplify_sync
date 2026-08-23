@@ -16,11 +16,11 @@ function DashboardContent() {
   return (
     <>
       {/* Column 2: Sidebar (Conversation List) */}
-      <aside className="w-[var(--spacing-sidebar-width)] h-full bg-[var(--color-surface)] border-r border-[var(--color-outline-variant)] flex flex-col shrink-0 z-10">
-        <header className="h-20 px-[var(--spacing-margin-container)] flex items-end pb-4 shrink-0 border-b border-[var(--color-outline-variant)]/30">
+      <aside className="w-[var(--spacing-sidebar-width)] h-full bg-[var(--color-surface)] border-r border-[var(--color-outline-variant)] flex  w-auto flex-col shrink-0 z-10">
+        <header className="h-15 px-[var(--spacing-margin-container)] flex items-end pb-3 shrink-0 border-b border-[var(--color-outline-variant)]/30">
           <h1 className="font-headline-lg text-[var(--text-headline-lg)] font-bold tracking-tight text-[var(--color-on-surface)]">Inbox</h1>
         </header>
-        <div className="flex-1 overflow-y-auto py-2 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto py-1 custom-scrollbar">
           <DeviceManager selectedDeviceId={selectedDevice?.id} onSelectDevice={(id, name) => {
              setSelectedDevice({ id, name });
              if (view !== 'chat') {

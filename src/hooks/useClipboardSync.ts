@@ -39,12 +39,22 @@ export const useClipboardSync = (socket: Socket | null, targetDeviceId: string |
 
     try {
       const text = await navigator.clipboard.readText();
-      socket.emit('clipboard:sync', { targetDeviceId, data: text });
+      
+      const response = await fetch('/api/clipboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetDeviceId, data: text }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to sync clipboard via API');
+      }
+
       setError(null);
-      console.log('[Clipboard] Sent to peer');
+      console.log('[Clipboard] Sent to peer via API');
     } catch (err) {
-      console.error('[Clipboard] Failed to read:', err);
-      setError('Clipboard access denied. Click document and try again.');
+      console.error('[Clipboard] Failed to read/send:', err);
+      setError('Clipboard sync failed. Ensure document is focused or try again.');
     }
   };
 

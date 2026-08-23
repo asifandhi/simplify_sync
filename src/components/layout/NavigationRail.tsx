@@ -26,7 +26,7 @@ export default function NavigationRail() {
         <Link
           href="/?view=chat"
           aria-label="Home"
-          className="w-10 h-10 flex items-center justify-center rounded-lg text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-surface-container-low)] transition-all duration-200 group"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-surface-container-low)] transition-all duration-200 group"
         >
           <span className="material-symbols-outlined group-hover:scale-110 transition-transform text-[20px]">
             home
@@ -35,7 +35,7 @@ export default function NavigationRail() {
         <Link
           href="/?view=settings"
           aria-label="Settings"
-          className="w-10 h-10 flex items-center justify-center rounded-lg text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-surface-container-low)] transition-all duration-200 group"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-surface-container-low)] transition-all duration-200 group"
         >
           <span className="material-symbols-outlined group-hover:scale-110 transition-transform text-[20px]">
             settings
@@ -48,7 +48,7 @@ export default function NavigationRail() {
         <button
           onClick={toggleTheme}
           aria-label="Toggle Theme"
-          className="w-10 h-10 flex items-center justify-center rounded-lg text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-surface-container-low)] transition-all duration-200 group"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-surface-container-low)] transition-all duration-200 group"
         >
           <span className="material-symbols-outlined group-hover:scale-110 transition-transform text-[20px]">
             {theme === "dark" ? "dark_mode" : "light_mode"}
@@ -57,7 +57,7 @@ export default function NavigationRail() {
         <Link
           href="/?view=pairing"
           aria-label="New Conversation"
-          className="w-10 h-10 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-[var(--color-on-primary)] hover:bg-[var(--color-primary-container)] transition-colors shadow-[0_0_10px_rgba(255,255,255,0.1)] hover:shadow-[0_0_15px_rgba(255,255,255,0.2)]"
+          className="w-8 h-8 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-[var(--color-on-primary)] hover:bg-[var(--color-primary-container)] transition-colors shadow-[0_0_10px_rgba(255,255,255,0.1)] hover:shadow-[0_0_15px_rgba(255,255,255,0.2)]"
         >
           <span className="material-symbols-outlined text-[18px]">add</span>
         </Link>

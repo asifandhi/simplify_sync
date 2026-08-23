@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Symplify-Sync Chat Background Pattern</title>
+<style>
+  /* ===== COLOR TOKENS — Change these to retheme ===== */
+  :root{
+    --stroke:#448DFD;
+    --stroke-width:1.6;
+    --fill:#448DFD;
+    --bg:#ffffff;
+    --curve:#9ec5fd;
+    --curve-width:1.2;
+    --filler-opacity:0.5;
+    --pin-hole:#ffffff;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  svg.pattern{width:100%;max-width:1020px;}
+  .ico{fill:none;stroke:var(--stroke);stroke-width:var(--stroke-width);stroke-linecap:round;stroke-linejoin:round;}
+  .fillIco{fill:var(--fill);stroke:none;}
+  .dot{fill:var(--stroke);stroke:none;}
+  .logotext{font-family:Arial,Helvetica,sans-serif;font-weight:600;font-size:11px;fill:var(--stroke);}
+  .curve{fill:none;stroke:var(--curve);stroke-width:var(--curve-width);stroke-dasharray:3 4;stroke-linecap:round;}
+  .filler{opacity:var(--filler-opacity);}
+</style>
+</head>
+<body>
+<svg class="pattern" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <!-- 1. filled map pin -->
+  <g id="pin">
+    <path class="fillIco" d="M0,-14 C6.5,-14 11,-9.5 11,-4 C11,4 0,14 0,14 C0,14 -11,4 -11,-4 C-11,-9.5 -6.5,-14 0,-14 Z"/>
+    <circle cx="0" cy="-4" r="3.2" fill="var(--pin-hole)"/>
+  </g>
+  <!-- 2. phone plain -->
+  <g id="phonePlain">
+    <rect class="ico" x="-7" y="-14" width="14" height="28" rx="2.5"/>
+  </g>
+  <!-- 3. phone dotted signal -->
+  <g id="phoneDots">
+    <rect class="ico" x="-7" y="-14" width="14" height="28" rx="2.5"/>
+    <line class="ico" stroke-dasharray="1.5 2.5" x1="0" y1="-8" x2="0" y2="8"/>
+  </g>
+  <!-- 4. phone double arrow -->
+  <g id="phoneArrows">
+    <rect class="ico" x="-9" y="-16" width="18" height="32" rx="3"/>
+    <path class="ico" d="M-4,0 h8 M1,-3 l3,3 l-3,3 M-1,-3 l-3,3 l3,3"/>
+  </g>
+  <!-- 5. laptop sync -->
+  <g id="laptopSync">
+    <path class="ico" d="M-15,-12 h30 v15 h-30 Z"/>
+    <path class="ico" d="M-21,3 h42 l-3.5,6 h-35 Z"/>
+    <circle class="ico" cx="0" cy="-4.5" r="5.5"/>
+    <path class="ico" d="M3.8,-7.2 A5.5,5.5 0 1 1 -2.5,-9.5"/>
+    <path class="ico" d="M2.8,-9.3 l1,2.1 l2,-1"/>
+  </g>
+  <!-- 6. laptop arrows -->
+  <g id="laptopArrows">
+    <path class="ico" d="M-15,-12 h30 v15 h-30 Z"/>
+    <path class="ico" d="M-21,3 h42 l-3.5,6 h-35 Z"/>
+    <path class="ico" d="M-5,-4.5 h10 M2,-7.5 l3,3 l-3,3 M-2,-7.5 l-3,3 l3,3"/>
+  </g>
+  <!-- 7. monitor circular arrows -->
+  <g id="monitorCircular">
+    <rect class="ico" x="-17" y="-13" width="34" height="21" rx="2"/>
+    <path class="ico" d="M-4,13 h8 M0,8 v5"/>
+    <path class="ico" d="M5,-3.5 A6,6 0 0 0 -3.5,-8.5 M-5,3.5 A6,6 0 0 0 3.5,8.5" transform="translate(0,-4) scale(0.9)"/>
+    <path class="ico" d="M4,-9 l2,1.3 l-.6,2.2 M-4,9 l-2,-1.3 l.6,-2.2" transform="translate(0,-4) scale(0.9)"/>
+  </g>
+  <!-- 8. monitor straight arrows -->
+  <g id="monitorStraight">
+    <rect class="ico" x="-17" y="-13" width="34" height="21" rx="2"/>
+    <path class="ico" d="M-4,13 h8 M0,8 v5"/>
+    <path class="ico" d="M-6,-2.5 h12 M3,-5.5 l3,3 l-3,3 M-3,-5.5 l-3,3 l3,3"/>
+  </g>
+  <!-- 9. monitor wifi -->
+  <g id="monitorWifi">
+    <rect class="ico" x="-17" y="-13" width="34" height="21" rx="2"/>
+    <path class="ico" d="M-4,13 h8 M0,8 v5"/>
+    <path class="ico" d="M-8,-6 A11,11 0 0 1 8,-6"/>
+    <path class="ico" d="M-5,-3 A7,7 0 0 1 5,-3"/>
+    <circle class="dot" cx="0" cy="-1" r="1.4"/>
+  </g>
+  <!-- 10. wifi -->
+  <g id="wifi">
+    <path class="ico" d="M-11,-2 A16,16 0 0 1 11,-2"/>
+    <path class="ico" d="M-7,3 A10,10 0 0 1 7,3"/>
+    <path class="ico" d="M-3,8 A5,5 0 0 1 3,8"/>
+    <circle class="dot" cx="0" cy="9" r="1.6"/>
+  </g>
+  <!-- 11. cloud bidirectional -->
+  <g id="cloudBi">
+    <path class="ico" d="M-11,6 A7,7 0 0 1 -9,-7 A9,9 0 0 1 8,-9 A7,7 0 0 1 11,6 Z"/>
+    <path class="ico" d="M0,-5 v12 M-3,-2 l3,-3 l3,3 M-3,4 l3,3 l3,-3"/>
+  </g>
+  <!-- 12. cloud up -->
+  <g id="cloudUp">
+    <path class="ico" d="M-11,6 A7,7 0 0 1 -9,-7 A9,9 0 0 1 8,-9 A7,7 0 0 1 11,6 Z"/>
+    <path class="ico" d="M0,5 v-10 M-3,-2 l3,-3 l3,3"/>
+  </g>
+  <!-- 13. circle right arrow -->
+  <g id="circleArrow">
+    <circle class="ico" cx="0" cy="0" r="11"/>
+    <path class="ico" d="M-4,0 h9 M2,-4 l4,4 l-4,4"/>
+  </g>
+  <!-- 14. circle target -->
+  <g id="circleTarget">
+    <circle class="ico" cx="0" cy="0" r="6"/>
+    <circle class="dot" cx="0" cy="0" r="1.6"/>
+    <path class="ico" d="M4,-4 l4,-4"/>
+  </g>
+  <!-- 15. sync loop -->
+  <g id="syncLoop">
+    <path class="ico" d="M9,0 A9,9 0 1 1 5,-7.8"/>
+    <path class="ico" d="M9,-5 L9,0 L4,0"/>
+  </g>
+  <!-- 16. dashed ring -->
+  <g id="dashedRing">
+    <circle class="ico" stroke-dasharray="2.5 3.5" cx="0" cy="0" r="9"/>
+  </g>
+  <!-- 17. chain link -->
+  <g id="chainLink">
+    <rect class="ico" x="-11" y="-6" width="12" height="12" rx="6" transform="rotate(-30 -5 0)"/>
+    <rect class="ico" x="-1" y="-6" width="12" height="12" rx="6" transform="rotate(-30 5 0)"/>
+  </g>
+  <!-- 18. share node -->
+  <g id="shareNode">
+    <circle class="ico" cx="-7" cy="-7" r="2.2"/>
+    <circle class="ico" cx="-7" cy="7" r="2.2"/>
+    <circle class="ico" cx="7" cy="0" r="2.2"/>
+    <path class="ico" d="M-5,-6 L5,-1.5 M-5,6 L5,1.5"/>
+  </g>
+  <!-- 19. chevrons -->
+  <g id="chevronRight"><path class="ico" d="M-7,-6 L-1,0 L-7,6 M-1,-6 L5,0 L-1,6"/></g>
+  <g id="chevronLeft"><path class="ico" d="M7,-6 L1,0 L7,6 M1,-6 L-5,0 L1,6"/></g>
+  <!-- 20. dot grids -->
+  <g id="dotGrid">
+    <circle class="dot" cx="-5" cy="-5" r="1.5"/><circle class="dot" cx="5" cy="-5" r="1.5"/>
+    <circle class="dot" cx="-5" cy="5" r="1.5"/><circle class="dot" cx="5" cy="5" r="1.5"/>
+  </g>
+  <g id="dotGrid3">
+    <circle class="dot" cx="-4" cy="-4" r="1.2"/><circle class="dot" cx="0" cy="-4" r="1.2"/><circle class="dot" cx="4" cy="-4" r="1.2"/>
+    <circle class="dot" cx="-4" cy="0" r="1.2"/><circle class="dot" cx="0" cy="0" r="1.2"/><circle class="dot" cx="4" cy="0" r="1.2"/>
+    <circle class="dot" cx="-4" cy="4" r="1.2"/><circle class="dot" cx="0" cy="4" r="1.2"/><circle class="dot" cx="4" cy="4" r="1.2"/>
+  </g>
+  <!-- 21. fillers -->
+  <g id="plus"><path class="ico" stroke-width="1.3" d="M0,-4 v8 M-4,0 h8"/></g>
+  <g id="circleHollow"><circle class="ico" stroke-width="1.2" cx="0" cy="0" r="4.5"/></g>
+  <g id="diamond"><path class="ico" stroke-width="1.2" d="M0,-4 L4,0 L0,4 L-4,0 Z"/></g>
+  <!-- 22. logo badge -->
+  <g id="logoBadge">
+    <circle class="ico" cx="0" cy="0" r="11"/>
+    <path class="ico" d="M6,-5 A7,7 0 0 0 -6,3"/>
+    <path class="ico" d="M6,-8 L6,-5 L3,-5"/>
+    <path class="ico" d="M-6,5 A7,7 0 0 0 6,-3"/>
+    <path class="ico" d="M-6,8 L-6,5 L-3,5"/>
+    <text x="-3.5" y="4" font-family="Arial" font-weight="700" font-size="10" fill="var(--stroke)">S</text>
+  </g>
+  <!-- 23. arrows -->
+  <g id="arrowR"><path class="ico" stroke-width="1.3" d="M-5,0 h10 M2,-3 l3,3 l-3,3"/></g>
+  <g id="arrowL"><path class="ico" stroke-width="1.3" d="M5,0 h-10 M-2,-3 l-3,3 l3,3"/></g>
+  <g id="arrowU"><path class="ico" stroke-width="1.3" d="M0,5 v-10 M-3,-2 l3,-3 l3,3"/></g>
+  <g id="arrowD"><path class="ico" stroke-width="1.3" d="M0,-5 v10 M-3,2 l3,3 l3,-3"/></g>
+  <!-- 24. NAVIGATION / DIRECTION ARROW (compass style) -->
+  <g id="navArrow">
+    <!-- <path class="fillIco" d="M0,-13 L-7,11 L0,4 Z" opacity="0.9"/> -->
+    <path class="ico" stroke-width="1.4" d="M0,-13 L-7,11 L0,4 L7,11 Z"/>
+  </g>
+  <!-- 25. small nav arrow (rotated variations placed inline) -->
+  <g id="navArrowSmall">
+    <path class="fillIco" d="M0,-9 L-5,7 L0,2 Z" opacity="0.8"/>
+    <path class="ico" stroke-width="1.2" d="M0,-9 L-5,7 L0,2 L5,7 Z"/>
+  </g>
+</defs>
+
+<!-- ============================================================ -->
+<!--  LAYER 1: DASHED CURVES (short dashes, tight gaps)           -->
+<!-- ============================================================ -->
+<g id="curves">
+  <!-- All curves are SHORT connectors between nearby icon pairs -->
+
+  <!-- dashedRing → pin (top-left) -->
+  <path class="curve" d="M 45,34 Q 110,9 175,39"/>
+  <!-- pin → circleArrow (top) -->
+  <path class="curve" d="M 195,30 Q 230,42 258,65"/>
+  <!-- shareNode → laptopArrows (upper) -->
+  <path class="curve" d="M 370,108 Q 430,85 478,90"/>
+  <!-- laptopArrows → monitorStraight (top) -->
+  <path class="curve" d="M 510,88 Q 575,65 648,85"/>
+  <!-- monitorStraight → navArrow (top-right) -->
+  <path class="curve" d="M 680,85 Q 755,55 838,55"/>
+  <!-- wifi → pin (top-right corner) -->
+  <path class="curve" d="M 885,45 Q 900,30 912,25"/>
+
+  <!-- phoneDots → logoBadge (left side) -->
+  <path class="curve" d="M 82,132 Q 75,148 75,170"/>
+  <!-- logoBadge → chevronRight -->
+  <path class="curve" d="M 155,182 Q 270,162 385,168"/>
+  <!-- chevronRight → wifi -->
+  <path class="curve" d="M 408,170 Q 425,178 442,182"/>
+  <!-- wifi → circleTarget -->
+  <path class="curve" d="M 465,185 Q 498,178 528,175"/>
+  <!-- circleTarget → cloudUp (upper-mid) -->
+  <path class="curve" d="M 548,172 Q 610,158 668,165"/>
+
+  <!-- cloudBi → phoneDots (transfer scene) -->
+  <path class="curve" d="M 255,272 Q 290,298 330,308"/>
+  <!-- pin → cloudUp (mid row) -->
+  <path class="curve" d="M 480,278 Q 520,268 552,278"/>
+  <!-- cloudUp → pin (mid) -->
+  <path class="curve" d="M 575,278 Q 625,255 670,252"/>
+  <!-- logoBadge → wifi (mid-right) -->
+  <path class="curve" d="M 735,308 Q 788,282 835,270"/>
+
+  <!-- laptopSync → pin (center-left) -->
+  <path class="curve" d="M 105,375 Q 190,345 275,342"/>
+  <!-- circleArrow → laptopArrows (center) -->
+  <path class="curve" d="M 378,402 Q 425,395 462,405"/>
+  <!-- laptopArrows → chevronLeft (center) -->
+  <path class="curve" d="M 498,405 Q 515,398 525,402"/>
+  <!-- cloudBi → monitorCircular (center-right) -->
+  <path class="curve" d="M 605,355 Q 650,368 690,385"/>
+  <!-- monitorCircular → phonePlain (transfer connector) -->
+  <path class="curve" d="M 720,388 Q 742,385 758,388"/>
+
+  <!-- phonePlain → laptopSync (transfer scene, lower-left) -->
+  <path class="curve" d="M 178,462 Q 205,458 228,462"/>
+  <!-- cloudUp → pin (lower center) -->
+  <path class="curve" d="M 540,448 Q 510,462 492,475"/>
+  <!-- syncLoop → monitorCircular (lower-mid) -->
+  <path class="curve" d="M 612,475 Q 668,468 725,475"/>
+  <!-- chainLink → navArrow (lower-right) -->
+  <path class="curve" d="M 860,432 Q 888,452 915,475"/>
+
+  <!-- pin → pin (left col, short arc) -->
+  <path class="curve" d="M 62,585 Q 168,605 282,610"/>
+  <!-- logoBadge → circleArrow (lower) -->
+  <path class="curve" d="M 390,630 Q 432,628 468,632"/>
+  <!-- dashedRing → wifi (right) -->
+  <path class="curve" d="M 755,562 Q 790,570 820,582"/>
+
+  <!-- cloudUp → phoneArrows (bottom transfer) -->
+  <path class="curve" d="M 168,682 Q 225,688 275,688"/>
+  <!-- pin → wifi (bottom-left) -->
+  <path class="curve" d="M 318,712 Q 345,718 368,722"/>
+  <!-- circleArrow → pin (bottom-right) -->
+  <path class="curve" d="M 788,698 Q 798,702 802,708"/>
+  <!-- phonePlain → laptopArrows (bottom-right transfer) -->
+  <path class="curve" d="M 925,722 Q 948,718 965,722"/>
+
+  <!-- syncLoop → chevronRight (bottom row) -->
+  <path class="curve" d="M 185,830 Q 218,842 248,855"/>
+  <!-- circleArrow → wifi (bottom) -->
+  <path class="curve" d="M 355,868 Q 395,878 432,888"/>
+  <!-- monitorWifi → phonePlain (bottom transfer) -->
+  <path class="curve" d="M 608,855 Q 635,862 658,872"/>
+  <!-- pin → monitorStraight (bottom-right) -->
+  <path class="curve" d="M 808,878 Q 870,888 932,898"/>
+
+  <!-- cloudBi → phoneArrows (very bottom) -->
+  <path class="curve" d="M 268,940 Q 315,945 358,952"/>
+  <!-- circleArrow → chainLink (very bottom) -->
+  <path class="curve" d="M 638,958 Q 690,948 738,948"/>
+</g>
+
+<!-- ============================================================ -->
+<!--  LAYER 2: MAJOR ICONS                                        -->
+<!-- ============================================================ -->
+<g id="icons">
+  <!-- ===== TOP BAND (y 15-90) ===== -->
+  <use href="#dashedRing" transform="translate(30,42) scale(0.92)"/>
+  <use href="#pin" transform="translate(185,25) scale(0.6) rotate(19)"/>
+  <use href="#circleArrow" transform="translate(268,72) scale(0.72) rotate(56)"/>
+  <use href="#laptopArrows" transform="translate(490,88) scale(0.8)"/>
+  <use href="#navArrow" transform="translate(845,55) rotate(145) scale(0.7)"/>
+  <use href="#pin" transform="translate(920,22) scale(0.89)  rotate(159)"/>
+  <use href="#wifi" transform="translate(875,45) scale(0.7)"/>
+  <use href="#phoneArrows" transform="translate(962,58) scale(0.65)"/>
+
+  <!-- ===== UPPER BAND (y 95-155) ===== -->
+  <use href="#phoneDots" transform="translate(82,115) scale(0.68)"/>
+  <use href="#monitorStraight" transform="translate(660,90) scale(0.72)"/>
+  <use href="#phoneArrows" transform="translate(958,125) scale(0.65)"/>
+  <use href="#shareNode" transform="translate(358,108) scale(0.72)"/>
+  <use href="#navArrowSmall" transform="translate(528,55) rotate(-115) scale(0.6)"/>
+
+  <!-- ===== ROW 3 (y 155-225) ===== -->
+  <use href="#logoBadge" transform="translate(72,182) scale(0.88)"/>
+  <text class="logotext" x="90" y="186">Symplify-Sync</text>
+  <use href="#chevronRight" transform="translate(395,168) scale(0.88)"/>
+  <use href="#wifi" transform="translate(452,185) scale(0.7)"/>
+  <use href="#circleTarget" transform="translate(538,172) scale(0.78)"/>
+  <use href="#cloudUp" transform="translate(680,165) scale(0.7)"/>
+  <use href="#navArrowSmall" transform="translate(790,185) rotate(240) scale(0.55)"/>
+
+  <!-- ===== ROW 4 TRANSFER SCENES (y 235-320) ===== -->
+  <!-- Scene: cloud uploading → phone receiving -->
+  <use href="#cloudBi" transform="translate(245,262) scale(0.82)"/>
+  <use href="#phoneDots" transform="translate(340,310) scale(0.62)"/>
+  <!-- Scene: pin destination -->
+  <use href="#pin" transform="translate(470,278) scale(1.6) rotate(129)"/>
+  <use href="#cloudUp" transform="translate(562,278) scale(1.72)"/>
+  <use href="#pin" transform="translate(680,248)"/>
+  <!-- Scene: logo + text -->
+  <use href="#logoBadge" transform="translate(720,308) scale(0.88)"/>
+  <text class="logotext" x="738" y="312">Symplify-Sync</text>
+  <use href="#wifi" transform="translate(842,268) scale(0.65)"/>
+  <use href="#navArrow" transform="translate(920,270) rotate(-70) scale(0.6)"/>
+
+  <!-- ===== ROW 5 (y 330-410) ===== -->
+  <use href="#laptopSync" transform="translate(82,378) scale(0.75)"/>
+  <use href="#pin" transform="translate(285,338) scale(1.6) rotate(289)"/>
+  <use href="#circleArrow" transform="translate(365,402) scale(0.78)"/>
+  <use href="#laptopArrows" transform="translate(475,405) scale(0.72)"/>
+  <use href="#chevronLeft" transform="translate(535,402) scale(0.88)"/>
+  <use href="#cloudBi" transform="translate(592,352) scale(0.7)"/>
+  <!-- Scene: monitor transferring to phone -->
+  <use href="#monitorCircular" transform="translate(700,388) scale(0.72)"/>
+  <use href="#arrowR" transform="translate(738,388) scale(0.6)"/>
+  <use href="#phonePlain" transform="translate(768,388) scale(0.6)"/>
+  <use href="#phoneArrows" transform="translate(928,338) scale(0.65)"/>
+  <use href="#pin" transform="translate(965,320)"/>
+
+  <!-- ===== ROW 6 TRANSFER SCENES (y 420-510) ===== -->
+  <use href="#wifi" transform="translate(48,442) scale(0.68)"/>
+  <!-- Scene: phone → laptop side-by-side transfer -->
+  <use href="#phonePlain" transform="translate(168,462) scale(0.62)"/>
+  <use href="#arrowR" transform="translate(195,462) scale(0.55)"/>
+  <use href="#laptopSync" transform="translate(240,465) scale(0.62)"/>
+  <use href="#cloudUp" transform="translate(532,448) scale(0.7)"/>
+  <use href="#pin" transform="translate(485,478) scale(0.9) rotate(109)"/>
+  <use href="#wifi" transform="translate(438,508) scale(0.68)"/>
+  <use href="#monitorCircular" transform="translate(735,475) scale(0.75)"/>
+  <use href="#chainLink" transform="translate(848,428) scale(0.75)"/>
+  <use href="#navArrowSmall" transform="translate(920,478) rotate(160) scale(0.55)"/>
+  <use href="#syncLoop" transform="translate(600,475) scale(0.72)"/>
+
+  <!-- ===== ROW 7 (y 530-600) ===== -->
+  <use href="#pin" transform="translate(58,572) scale(1.5) rotate(154)"/>
+  <use href="#dotGrid3" transform="translate(328,568)"/>
+  <use href="#shareNode" transform="translate(460,555) scale(0.72)"/>
+  <use href="#pin" transform="translate(292,608) scale(0.6) rotate(9)"/>
+  <use href="#logoBadge" transform="translate(375,628) scale(0.88)"/>
+  <text class="logotext" x="393" y="632">Symplify-Sync</text>
+  <use href="#circleArrow" transform="translate(478,635) scale(0.78)"/>
+  <use href="#navArrow" transform="translate(628,575) rotate(285) scale(3)"/>
+  <use href="#dashedRing" transform="translate(742,562) scale(0.72)"/>
+  <use href="#wifi" transform="translate(828,585) scale(0.65)"/>
+
+  <!-- ===== ROW 8 TRANSFER SCENES (y 640-740) ===== -->
+  <use href="#laptopSync" transform="translate(46,738) scale(0.75)"/>
+  <!-- Scene: cloud → phone transfer -->
+  <use href="#cloudUp" transform="translate(155,678) scale(0.7)"/>
+  <use href="#phoneArrows" transform="translate(285,688) scale(0.62)"/>
+  <use href="#pin" transform="translate(308,708) scale(0.6) rotate(36)"/>
+  <use href="#wifi" transform="translate(375,725) scale(0.68)"/>
+  <!-- Scene: pin → circleArrow showing data sent -->
+  <use href="#pin" transform="translate(532,752) scale(0.6) rotate(163)"/>
+  <use href="#circleArrow" transform="translate(775,698) scale(0.82)"/>
+  <use href="#pin" transform="translate(808,712) scale(2.6) rotate(189)"/>
+  <use href="#navArrowSmall" transform="translate(888,695) rotate(-130) scale(0.55)"/>
+  <!-- Scene: phone → laptop near bottom-right -->
+  <use href="#phonePlain" transform="translate(915,722) scale(0.6)"/>
+  <use href="#arrowR" transform="translate(940,722) scale(0.5)"/>
+  <use href="#laptopArrows" transform="translate(975,725) scale(0.58)"/>
+
+  <!-- ===== ROW 9 (y 760-880) ===== -->
+  <use href="#syncLoop" transform="translate(172,828) scale(0.78)"/>
+  <use href="#chevronRight" transform="translate(258,858) scale(0.88)"/>
+  <use href="#circleArrow" transform="translate(342,868) scale(0.78)"/>
+  <use href="#wifi" transform="translate(442,892) scale(0.75)"/>
+  <use href="#monitorWifi" transform="translate(588,852) scale(0.75)"/>
+  <use href="#phonePlain" transform="translate(668,875) scale(0.65)"/>
+  <use href="#pin" transform="translate(798,872) scale(0.6) rotate(19)"/>
+  <use href="#monitorStraight" transform="translate(942,902) scale(1.72)"/>
+  <use href="#wifi" transform="translate(898,832) scale(0.62)"/>
+  <use href="#navArrow" transform="translate(120,880) rotate(5) scale(0.55)"/>
+
+  <!-- ===== BOTTOM BAND (y 900-990) ===== -->
+  <use href="#cloudBi" transform="translate(255,938) scale(0.68)"/>
+  <use href="#phoneArrows" transform="translate(368,955) scale(0.58)"/>
+  <use href="#navArrowSmall" transform="translate(488,945) rotate(190) scale(0.5)"/>
+  <use href="#circleArrow" transform="translate(625,958) scale(0.72)"/>
+  <use href="#chainLink" transform="translate(748,948) scale(0.68)"/>
+  <use href="#laptopSync" transform="translate(870,960) scale(0.6)"/>
+</g>
+
+<!-- ============================================================ -->
+<!--  LAYER 3: FILLER ELEMENTS (high density)                     -->
+<!-- ============================================================ -->
+<g id="fillers" class="filler">
+  <!-- Plus signs -->
+  <use href="#plus" transform="translate(88,28) scale(0.62)"/>
+  <use href="#plus" transform="translate(345,28) scale(0.58)"/>
+  <use href="#plus" transform="translate(570,22) scale(0.55)"/>
+  <use href="#plus" transform="translate(655,28) scale(0.55)"/>
+  <use href="#plus" transform="translate(760,18) scale(0.52)"/>
+  <use href="#plus" transform="translate(815,25) scale(0.52)"/>
+  <use href="#plus" transform="translate(435,88) scale(0.55)"/>
+  <use href="#plus" transform="translate(510,108) scale(0.55)"/>
+  <use href="#plus" transform="translate(648,125) scale(0.52)"/>
+  <use href="#plus" transform="translate(820,138) scale(0.52)"/>
+  <use href="#plus" transform="translate(498,175) scale(0.55)"/>
+  <use href="#plus" transform="translate(745,172) scale(0.52)"/>
+  <use href="#plus" transform="translate(158,232) scale(0.52)"/>
+  <use href="#plus" transform="translate(352,242) scale(0.52)"/>
+  <use href="#plus" transform="translate(610,245) scale(0.52)"/>
+  <use href="#plus" transform="translate(828,258) scale(0.52)"/>
+  <use href="#plus" transform="translate(420,338) scale(0.52)"/>
+  <use href="#plus" transform="translate(680,368) scale(0.52)"/>
+  <use href="#plus" transform="translate(860,355) scale(0.52)"/>
+  <use href="#plus" transform="translate(310,398) scale(0.52)"/>
+  <use href="#plus" transform="translate(415,442) scale(0.52)"/>
+  <use href="#plus" transform="translate(598,468) scale(0.52)"/>
+  <use href="#plus" transform="translate(788,498) scale(0.52)"/>
+  <use href="#plus" transform="translate(135,528) scale(0.52)"/>
+  <use href="#plus" transform="translate(398,548) scale(0.52)"/>
+  <use href="#plus" transform="translate(548,538) scale(0.52)"/>
+  <use href="#plus" transform="translate(700,532) scale(0.52)"/>
+  <use href="#plus" transform="translate(498,608) scale(0.52)"/>
+  <use href="#plus" transform="translate(690,622) scale(0.52)"/>
+  <use href="#plus" transform="translate(28,608) scale(0.52)"/>
+  <use href="#plus" transform="translate(158,702) scale(0.52)"/>
+  <use href="#plus" transform="translate(450,738) scale(0.52)"/>
+  <use href="#plus" transform="translate(638,748) scale(0.52)"/>
+  <use href="#plus" transform="translate(538,808) scale(0.52)"/>
+  <use href="#plus" transform="translate(758,808) scale(0.52)"/>
+  <use href="#plus" transform="translate(138,922) scale(0.52)"/>
+  <use href="#plus" transform="translate(555,928) scale(0.52)"/>
+  <use href="#plus" transform="translate(828,918) scale(0.52)"/>
+  <use href="#plus" transform="translate(42,958) scale(0.52)"/>
+
+  <!-- Hollow circles -->
+  <use href="#circleHollow" transform="translate(315,50) scale(0.68)"/>
+  <use href="#circleHollow" transform="translate(438,40) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(585,48) scale(0.58)"/>
+  <use href="#circleHollow" transform="translate(195,98) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(780,98) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(285,142) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(558,162) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(308,245) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(775,298) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(478,325) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(148,388) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(658,425) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(778,498) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(618,538) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(198,558) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(558,578) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(648,638) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(472,688) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(618,685) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(245,808) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(298,828) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(555,782) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(848,732) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(878,752) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(68,918) scale(0.55)"/>
+  <use href="#circleHollow" transform="translate(188,878) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(708,918) scale(0.52)"/>
+  <use href="#circleHollow" transform="translate(918,958) scale(0.52)"/>
+
+  <!-- Diamonds -->
+  <use href="#diamond" transform="translate(638,32) scale(0.52)"/>
+  <use href="#diamond" transform="translate(282,105) scale(0.5)"/>
+  <use href="#diamond" transform="translate(718,135) scale(0.5)"/>
+  <use href="#diamond" transform="translate(848,488) scale(0.52)"/>
+  <use href="#diamond" transform="translate(725,592) scale(0.52)"/>
+  <use href="#diamond" transform="translate(128,572) scale(0.52)"/>
+  <use href="#diamond" transform="translate(528,572) scale(0.52)"/>
+  <use href="#diamond" transform="translate(368,765) scale(0.5)"/>
+  <use href="#diamond" transform="translate(895,808) scale(0.5)"/>
+  <use href="#diamond" transform="translate(168,958) scale(0.5)"/>
+  <use href="#diamond" transform="translate(458,862) scale(0.5)"/>
+
+  <!-- Solid dots -->
+  <circle class="dot" cx="418" cy="772" r="2.2" opacity="0.5"/>
+  <circle class="dot" cx="155" cy="648" r="2.5" opacity="0.5"/>
+  <circle class="dot" cx="468" cy="562" r="2.2" opacity="0.5"/>
+  <circle class="dot" cx="328" cy="442" r="1.8" opacity="0.5"/>
+  <circle class="dot" cx="688" cy="52" r="1.8" opacity="0.5"/>
+  <circle class="dot" cx="758" cy="30" r="1.5" opacity="0.4"/>
+  <circle class="dot" cx="578" cy="418" r="2" opacity="0.5"/>
+  <circle class="dot" cx="198" cy="768" r="2" opacity="0.5"/>
+  <circle class="dot" cx="502" cy="778" r="1.8" opacity="0.45"/>
+  <circle class="dot" cx="635" cy="87" r="2.5" opacity="0.6"/>
+  <circle class="dot" cx="328" cy="152" r="1.8" opacity="0.45"/>
+  <circle class="dot" cx="900" cy="192" r="1.8" opacity="0.45"/>
+  <circle class="dot" cx="558" cy="302" r="2" opacity="0.5"/>
+  <circle class="dot" cx="178" cy="312" r="1.5" opacity="0.45"/>
+  <circle class="dot" cx="658" cy="548" r="1.8" opacity="0.45"/>
+  <circle class="dot" cx="408" cy="898" r="1.8" opacity="0.45"/>
+  <circle class="dot" cx="788" cy="578" r="1.5" opacity="0.4"/>
+  <circle class="dot" cx="88" cy="498" r="1.8" opacity="0.45"/>
+  <circle class="dot" cx="948" cy="548" r="1.5" opacity="0.4"/>
+  <circle class="dot" cx="298" cy="948" r="1.8" opacity="0.45"/>
+
+  <!-- Dot grids -->
+  <use href="#dotGrid" transform="translate(868,932) scale(0.78)"/>
+  <use href="#dotGrid3" transform="translate(152,428) scale(0.65)"/>
+  <use href="#dotGrid" transform="translate(718,468) scale(0.65)"/>
+  <use href="#dotGrid3" transform="translate(42,278) scale(0.6)"/>
+</g>
+
+</svg>
+</body>
+</html>
