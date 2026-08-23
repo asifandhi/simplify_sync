@@ -5,25 +5,26 @@ import { NextResponse } from "next/server";
 import { getIO } from "@/lib/socket";
 
 export const GET = asyncHandler(async (request: Request) => {
-  const { searchParams } = new URL(request.url);
-  const device_id = searchParams.get("device_id");
+  const device_id = request.headers.get("x-device-id");
 
   if (!device_id) {
-    return ApiResponse.error("Device not found", 404);
+    return ApiResponse.error("Unauthorized: Device not identified", 401);
   }
+  
   const chatHistory = getChatByDeviceId(device_id) || [];
   return ApiResponse.success({ messages: chatHistory.reverse() });
 });
 
 export const POST = asyncHandler(async (request: Request) => {
   const data = await request.json();
+  const device_id = request.headers.get("x-device-id");
 
-  if (!data.device_id) {
-    return ApiResponse.error("device_id is required", 400);
+  if (!device_id) {
+    return ApiResponse.error("Unauthorized: Device not identified", 401);
   }
 
   const savedMessage = insertChatMessage({
-    device_id: data.device_id,
+    device_id: device_id,
     sender: "me",
     content_type: data.content_type || "text",
     content: data.content,
@@ -34,7 +35,7 @@ export const POST = asyncHandler(async (request: Request) => {
 
   try {
     const io = getIO();
-    io.in(data.device_id).emit("receive_message", savedMessage);
+    io.in(device_id).emit("receive_message", savedMessage);
   } catch (err) {
     console.error("[API/Chat] Failed to broadcast message:", err);
   }
