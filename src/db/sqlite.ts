@@ -45,13 +45,13 @@ export function connectDB() {
   }
 }
 
-export function getChatByDeviceId(device_id: string) {
+export function getChatByDeviceId(device_id: string, limit: number = 50, offset: number = 0) {
   try {
     const stmt = db.prepare(
-      `SELECT * FROM chat_history WHERE device_id = ? ORDER BY timestamp DESC`,
+      `SELECT * FROM chat_history WHERE device_id = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?`,
     );
-    const rows = stmt.all(device_id);
-    return rows;
+    const rows = stmt.all(device_id, limit, offset);
+    return rows as any[];
   } catch (error) {
     console.error("Error fetching chat history:", error);
     return [];
@@ -181,14 +181,37 @@ export function insertDevice(data:DeviceInput) {
   return stmt.run(data);
 }
 
-export function deleteDevice(deviceId: string) {
-  // Delete associated chat history first (also handled by CASCADE,
-  // but explicit delete ensures cleanup even if PRAGMA foreign_keys is OFF)
-  const delChat = db.prepare('DELETE FROM chat_history WHERE device_id = ?');
-  delChat.run(deviceId);
+import fs from "fs";
+import path from "path";
 
-  const stmt = db.prepare('DELETE FROM devices WHERE device_id = ?');
-  return stmt.run(deviceId);
+export function deleteDevice(deviceId: string) {
+  try {
+    // 1. Find all files associated with this device to clean them up from disk
+    const findFilesStmt = db.prepare('SELECT file_path FROM chat_history WHERE device_id = ? AND file_path IS NOT NULL AND file_path != ""');
+    const files = findFilesStmt.all(deviceId) as { file_path: string }[];
+    
+    files.forEach(row => {
+      try {
+        const fullPath = path.join(process.cwd(), "uploads", row.file_path);
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
+      } catch (err) {
+        console.error("Failed to delete orphaned file:", row.file_path, err);
+      }
+    });
+
+    // 2. Delete associated chat history
+    const delChat = db.prepare('DELETE FROM chat_history WHERE device_id = ?');
+    delChat.run(deviceId);
+
+    // 3. Delete the device
+    const stmt = db.prepare('DELETE FROM devices WHERE device_id = ?');
+    return stmt.run(deviceId);
+  } catch (err) {
+    console.error("Error in deleteDevice:", err);
+    throw err;
+  }
 }
 
 export function getSetting(key: string) {

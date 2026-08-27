@@ -24,20 +24,76 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Pagination states
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const limit = 50;
+
   useEffect(() => {
     if (!deviceId) return;
+    setOffset(0);
+    setHasMore(true);
     axios
-      .get(`/api/chat?device_id=${deviceId}`)
-      .then((res) => setMessages(res.data.data.messages))
+      .get(`/api/chat?device_id=${deviceId}&limit=${limit}&offset=0`)
+      .then((res) => {
+        const newMsgs = res.data.data.messages;
+        setMessages(newMsgs);
+        if (newMsgs.length < limit) setHasMore(false);
+        // Scroll to bottom immediately on first load
+        setTimeout(() => {
+          if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+          }
+        }, 50);
+      })
       .catch(console.error);
     connectSocket(deviceId);
   }, [deviceId, connectSocket, setMessages]);
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  const handleScroll = () => {
+    if (scrollRef.current && scrollRef.current.scrollTop === 0 && hasMore && !isLoadingMore) {
+      loadMore();
     }
-  }, [messages]);
+  };
+
+  const loadMore = async () => {
+    setIsLoadingMore(true);
+    const nextOffset = offset + limit;
+    
+    // Remember current scroll height to maintain scroll position after inserting messages at the top
+    const previousScrollHeight = scrollRef.current?.scrollHeight || 0;
+
+    try {
+      const res = await axios.get(`/api/chat?device_id=${deviceId}&limit=${limit}&offset=${nextOffset}`);
+      const olderMsgs = res.data.data.messages;
+      
+      if (olderMsgs.length < limit) {
+        setHasMore(false);
+      }
+      
+      if (olderMsgs.length > 0) {
+        setOffset(nextOffset);
+        // Prepend older messages
+        setMessages([...olderMsgs, ...messages]);
+        
+        // Restore scroll position
+        setTimeout(() => {
+          if (scrollRef.current) {
+            const newScrollHeight = scrollRef.current.scrollHeight;
+            scrollRef.current.scrollTop = newScrollHeight - previousScrollHeight;
+          }
+        }, 0);
+      }
+    } catch (err) {
+      console.error("Failed to load more messages", err);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  // We remove the automatic scroll-to-bottom on *every* message change because it breaks scroll-to-top pagination.
+  // We only want to scroll to bottom if the user is already near the bottom, but for now we rely on initial scroll.
 
   const processFile = async (file: File) => {
     setUploading(true);
@@ -143,7 +199,29 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
       );
     }
 
-    return <span className="wrap-break-word">{msg.content}</span>;
+    let previewNode = null;
+    if (msg.preview_data) {
+      try {
+        const preview = typeof msg.preview_data === 'string' ? JSON.parse(msg.preview_data) : msg.preview_data;
+        if (preview.title || preview.description) {
+          previewNode = (
+            <div className="mt-2 text-sm border border-[var(--color-outline-variant)] rounded-lg p-2 bg-[var(--color-surface-container)] opacity-90 overflow-hidden">
+              {preview.title && <div className="font-semibold text-xs truncate mb-1">{preview.title}</div>}
+              {preview.description && <div className="text-[10px] text-[var(--color-on-surface-variant)] line-clamp-2">{preview.description}</div>}
+            </div>
+          );
+        }
+      } catch (err) {
+        // ignore JSON parse errors
+      }
+    }
+
+    return (
+      <div className="flex flex-col gap-1">
+        <span className="wrap-break-word whitespace-pre-wrap">{msg.content}</span>
+        {previewNode}
+      </div>
+    );
   };
 
   return (
@@ -210,6 +288,7 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
         className="flex-1 overflow-y-auto p-[var(--spacing-margin-container)] flex flex-col gap-6 z-0 pb-32 custom-scrollbar relative bg-[url('/chat-bg-dark.png')] [.light_&]:bg-[url('/chat-bg.png')]"
         style={{ backgroundSize: '400px', backgroundRepeat: 'repeat' }}
         ref={scrollRef}
+        onScroll={handleScroll}
       >
         {messages.map((msg, idx) => {
           // 'me' = sent from this web UI

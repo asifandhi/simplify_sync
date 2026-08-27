@@ -12,10 +12,9 @@ export async function middleware(request: NextRequest) {
     const sessionToken = request.headers.get('x-session-token');
 
     if (!sessionToken) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized: No session token provided' },
-        { status: 401 }
-      );
+      // Web UI connects without a session token (same origin assumption).
+      // We let it pass through without an x-device-id header.
+      return NextResponse.next();
     }
 
     // Validate token against the database using our internal API

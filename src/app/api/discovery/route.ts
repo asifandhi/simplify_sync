@@ -2,7 +2,7 @@ import { ApiResponse } from "@/lib/utils/ApiResponse";
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getIO } from "@/lib/socket";
-import { insertDevice } from "@/db/sqlite";
+import { insertDevice, getAllDevices } from "@/db/sqlite";
 import { tokenStore } from "@/lib/discovery/tokenStore";
 import { asyncHandler } from "@/lib/utils/asyncHandler";
 
@@ -16,6 +16,12 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     }
     if (!tokenStore.consume(temp_token)) {
       return ApiResponse.error("Invalid or expired token", 401);
+    }
+
+    // Server-side device limit enforcement (SEC-12)
+    const existingDevices = getAllDevices() as any[];
+    if (existingDevices.length >= 5) {
+      return ApiResponse.error("Device limit reached (max 5 devices)", 403);
     }
 
     // 2. Here you would normally validate the temp_token matches what you generated in the QR code.
