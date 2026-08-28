@@ -33,6 +33,9 @@ app.prepare().then(() => {
       res.end("Internal Server Error");
     }
   });
+
+  // Initialize Socket.io BEFORE listen() so io is non-null when the first
+  // request arrives and any API route calls getIO().
   initSocket(server);
 
   server.listen(port, (err?: any) => {

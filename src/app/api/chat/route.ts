@@ -65,7 +65,7 @@ export const POST = asyncHandler(async (request: Request) => {
 
   try {
     const io = getIO();
-    io.in(device_id).emit("receive_message", savedMessage);
+    if (io) io.in(device_id).emit("receive_message", savedMessage);
   } catch (err) {
     console.error("[API/Chat] Failed to broadcast message:", err);
   }

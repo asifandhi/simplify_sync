@@ -5,20 +5,29 @@ import { useSearchParams } from "next/navigation";
 import DeviceManager from "@/components/devices/DeviceManager";
 import ChatWindow from "@/components/chat/ChatWindow";
 import QRGenerator from "@/components/pairing/QRgenerator";
-
 import SettingsPanel from "@/components/settings/SettingsPanel";
+import { useChatStore } from "@/store/chatStore";
 
 function DashboardContent() {
   const searchParams = useSearchParams();
   const view = searchParams.get("view") || "chat"; // 'chat' | 'settings' | 'pairing'
   const [selectedDevice, setSelectedDevice] = useState<{ id: string; name: string } | null>(null);
+  const { isConnected } = useChatStore();
 
   return (
     <>
       {/* Column 2: Sidebar (Conversation List) */}
       <aside className="w-[var(--spacing-sidebar-width)] h-full bg-[var(--color-surface)] border-r border-[var(--color-outline-variant)] flex  w-auto flex-col shrink-0 z-10">
         <header className="h-15 px-[var(--spacing-margin-container)] flex items-end pb-3 shrink-0 border-b border-[var(--color-outline-variant)]/30">
-          <h1 className="font-headline-lg text-[var(--text-headline-lg)] font-bold tracking-tight text-[var(--color-on-surface)]">Inbox</h1>
+          <div className="flex items-center gap-2 w-full">
+            <h1 className="font-headline-lg text-[var(--text-headline-lg)] font-bold tracking-tight text-[var(--color-on-surface)]">Inbox</h1>
+            <span
+              title={isConnected ? "Server connected" : "Server disconnected — messages will queue"}
+              className={`inline-block w-2 h-2 rounded-full mb-0.5 flex-shrink-0 transition-colors duration-500 ${
+                isConnected ? "bg-green-500" : "bg-amber-400 animate-pulse"
+              }`}
+            />
+          </div>
         </header>
         <div className="flex-1 overflow-y-auto py-1 custom-scrollbar">
           <DeviceManager selectedDeviceId={selectedDevice?.id} onSelectDevice={(id, name) => {

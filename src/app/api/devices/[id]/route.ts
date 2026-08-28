@@ -24,9 +24,10 @@ export const DELETE = asyncHandler(
 
       deleteDevice(deviceId);
       return ApiResponse.success(null, "Device revoked successfully");
-    } catch (error) {
-      console.error("Error deleting device:", error);
-      return ApiResponse.error("Failed to revoke device", 500);
+    } catch (error: any) {
+      console.error("[API/Devices] Error deleting device:");
+      console.error(error?.stack || error);
+      return ApiResponse.error(`Failed to revoke device: ${error?.message || String(error)}`, 500);
     }
   },
 );

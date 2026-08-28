@@ -10,14 +10,17 @@ export default function NavigationRail() {
   const toggleTheme = () => {
     const newTheme = theme === "dark" ? "light" : "dark";
     setTheme(newTheme);
-    if (newTheme === "light") {
+  };
+
+  React.useEffect(() => {
+    if (theme === "light") {
       document.documentElement.classList.remove("dark");
       document.documentElement.classList.add("light");
     } else {
       document.documentElement.classList.remove("light");
       document.documentElement.classList.add("dark");
     }
-  };
+  }, [theme]);
 
   return (
     <nav className="w-[var(--spacing-nav-rail-width)] h-full bg-[var(--color-surface-container-lowest)] border-r border-[var(--color-outline-variant)] flex flex-col items-center py-[var(--spacing-stack-lg)] justify-between shrink-0 z-20">

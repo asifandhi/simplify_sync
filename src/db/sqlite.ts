@@ -1,5 +1,7 @@
 import Database from "better-sqlite3";
 import path from "path";
+import fs from "fs";
+
 
 // Ensure we have a default path in case process.env is not fully loaded by Next.js yet
 const db_path = process.env.DB_PATH || path.join(process.cwd(), "database", "Simplify-Sync.db");
@@ -181,13 +183,10 @@ export function insertDevice(data:DeviceInput) {
   return stmt.run(data);
 }
 
-import fs from "fs";
-import path from "path";
-
 export function deleteDevice(deviceId: string) {
   try {
     // 1. Find all files associated with this device to clean them up from disk
-    const findFilesStmt = db.prepare('SELECT file_path FROM chat_history WHERE device_id = ? AND file_path IS NOT NULL AND file_path != ""');
+    const findFilesStmt = db.prepare("SELECT file_path FROM chat_history WHERE device_id = ? AND file_path IS NOT NULL AND file_path != ''");
     const files = findFilesStmt.all(deviceId) as { file_path: string }[];
     
     files.forEach(row => {

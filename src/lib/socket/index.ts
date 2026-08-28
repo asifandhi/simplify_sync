@@ -16,6 +16,9 @@ export function initSocket(server: HTTPServer) {
       methods: ["GET", "POST"],
     },
   });
+  
+  // Attach to global so API routes in dev mode (which run in isolated contexts) can access it
+  (global as any).io = io;
 
   io.use((socket, next) => {
     const sessionToken = socket.handshake.auth.session_token;
@@ -144,14 +147,12 @@ export function initSocket(server: HTTPServer) {
       console.log(`[Socket] Clipboard sync from ${socket.id} to ${payload.targetDeviceId}`);
       socket.to(payload.targetDeviceId).emit("clipboard:receive", payload);
     });
+
   });
   console.log("> Socket.io server initialized");
 
   return io;
 }
-export function getIO() {
-  if (!io) {
-    throw new Error("Socket.io is not initialized.");
-  }
-  return io;
+export function getIO(): Server | null {
+  return (global as any).io || io || null;
 }

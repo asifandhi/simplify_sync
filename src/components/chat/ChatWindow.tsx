@@ -13,6 +13,8 @@ interface ChatWindowProps {
 function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
   const isDeviceOnline = useChatStore((s) => s.isDeviceOnline);
   const isChatOpen = useChatStore((s) => s.isChatOpen);
+  const pendingQueue = useChatStore((s) => s.pendingQueue);
+  const retryMessage = useChatStore((s) => s.retryMessage);
   const { messages, connectSocket, setMessages, sendMessage, socket } =
     useChatStore();
   const [input, setInput] = useState("");
@@ -285,7 +287,7 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
 
       {/* Messages Area */}
       <div
-        className="flex-1 overflow-y-auto p-[var(--spacing-margin-container)] flex flex-col gap-6 z-0 pb-32 custom-scrollbar relative bg-[url('/chat-bg-dark.png')] [.light_&]:bg-[url('/chat-bg.png')]"
+        className="flex-1 overflow-y-auto p-[var(--spacing-margin-container)] flex flex-col gap-2 z-0 pb-32 custom-scrollbar relative bg-[url('/chat-bg-dark.png')] [.light_&]:bg-[url('/chat-bg.png')]"
         style={{ backgroundSize: '400px', backgroundRepeat: 'repeat' }}
         ref={scrollRef}
         onScroll={handleScroll}
@@ -300,13 +302,44 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
               className={`flex flex-col max-w-[85%] md:max-w-[70%] gap-1 group ${isMe ? "self-end items-end" : "self-start"}`}
             >
               <div
-                className={`p-4 rounded-2xl font-body-md leading-relaxed ${isMe ? "border border-[var(--color-outline-variant)]/50 bg-[var(--color-surface-container-lowest)] text-[var(--color-on-surface)] rounded-tr-sm shadow-sm" : "bg-[var(--color-surface-container-high)] text-[var(--color-primary)] rounded-tl-sm border border-transparent"}`}
+                className={`px-4 py-0.5 rounded-2xl font-body-md leading-relaxed ${isMe ? "border border-[var(--color-outline-variant)]/50 bg-[var(--color-surface-container-lowest)] text-[var(--color-on-surface)] rounded-tr-sm shadow-sm" : "bg-[var(--color-surface-container-high)] text-[var(--color-primary)] rounded-tl-sm border border-transparent"}`}
               >
                 {renderBubbleContent(msg)}
               </div>
             </div>
           );
         })}
+
+        {/* Pending / Failed queue bubbles */}
+        {pendingQueue
+          .filter((p) => p.payload.device_id === deviceId)
+          .map((p) => (
+            <div key={p.localId} className="flex flex-col max-w-[85%] md:max-w-[70%] gap-1 self-end items-end">
+              <div
+                className={`px-4 py-1.5 rounded-2xl rounded-tr-sm font-body-md leading-relaxed flex items-center gap-2 ${
+                  p.status === 'failed'
+                    ? 'border border-[var(--color-error)]/60 bg-[var(--color-error-container)]/20 text-[var(--color-on-surface)]'
+                    : 'border border-[var(--color-outline-variant)]/30 bg-[var(--color-surface-container-lowest)]/60 text-[var(--color-on-surface)] opacity-60'
+                }`}
+              >
+                <span className="flex-1 wrap-break-word whitespace-pre-wrap text-sm">{p.payload.content}</span>
+                {p.status === 'failed' ? (
+                  <button
+                    onClick={() => retryMessage(p.localId)}
+                    title="Retry sending"
+                    className="flex items-center gap-1 text-[var(--color-error)] hover:opacity-80 transition-opacity shrink-0"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">error</span>
+                    <span className="text-[10px] font-medium">Retry</span>
+                  </button>
+                ) : (
+                  <span className="material-symbols-outlined text-[14px] shrink-0 animate-pulse text-[var(--color-on-surface-variant)]">
+                    schedule
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
       </div>
 
       {/* Input Area */}
