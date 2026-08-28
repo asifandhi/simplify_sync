@@ -23,10 +23,23 @@ export function initSocket(server: HTTPServer) {
   io.use((socket, next) => {
     const sessionToken = socket.handshake.auth.session_token;
 
-    // Allow the PC web client to connect without a session token
-    // (it connects from the same origin — no device_id needed for web UI)
     if (!sessionToken) {
-      // Web UI client — no device_id, but allowed to connect
+      // No token — only allow if the request originates from the same host (Web UI).
+      // In production the Origin header must match the server's own address.
+      const origin = socket.handshake.headers.origin || '';
+      const host = socket.handshake.headers.host || '';
+
+      // Same-origin check: origin must end with the host value (covers http://host and https://host)
+      const isSameOrigin = origin && host && origin.includes(host);
+
+      if (!isSameOrigin) {
+        console.warn(`[Socket.io] Rejected unauthenticated connection from origin: ${origin}`);
+        return next(new Error("Unauthorized: no session token and non-local origin"));
+      }
+
+      // Tag as web UI client — cannot use mobile-only events
+      socket.data.role = 'web';
+      socket.data.authenticated = false;
       return next();
     }
 
@@ -37,6 +50,7 @@ export function initSocket(server: HTTPServer) {
     }
 
     socket.data.device_id = device.device_id;
+    socket.data.role = 'mobile';
     socket.data.authenticated = true;
     next();
   });
