@@ -11,6 +11,34 @@ interface ChatWindowProps {
   deviceName: string;
 }
 
+function formatMessageTime(timestamp?: string): string {
+  if (!timestamp) return "";
+  const date = new Date(timestamp);
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function dateMaker(date?: string | Date): string {
+  if (!date) return "";
+
+  const inputDate = new Date(date);
+  if (isNaN(inputDate.getTime())) return ""; // Handle invalid date strings
+
+  const now = new Date();
+  const diffMs = now.getTime() - inputDate.getTime();
+
+  const oneDayMs = 24 * 60 * 60 * 1000; // 86,400,000 ms
+
+  if (diffMs < oneDayMs && inputDate.getDate() === now.getDate()) {
+    return "Today";
+  }
+
+  // Older -> return date (e.g., "Aug 29, 2026" or "29/08/2026")
+  return inputDate.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
   const enableDoubleClickCopy = useUserStore((s) => s.enableDoubleClickCopy);
   const isDeviceOnline = useChatStore((s) => s.isDeviceOnline);
@@ -22,7 +50,9 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
   const [input, setInput] = useState("");
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [copiedMessageId, setCopiedMessageId] = useState<string | number | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<
+    string | number | null
+  >(null);
 
   const { syncLocalClipboard, error } = useClipboardSync(socket, deviceId);
 
@@ -57,7 +87,12 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
   }, [deviceId, connectSocket, setMessages]);
 
   const handleScroll = () => {
-    if (scrollRef.current && scrollRef.current.scrollTop === 0 && hasMore && !isLoadingMore) {
+    if (
+      scrollRef.current &&
+      scrollRef.current.scrollTop === 0 &&
+      hasMore &&
+      !isLoadingMore
+    ) {
       loadMore();
     }
   };
@@ -65,28 +100,31 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
   const loadMore = async () => {
     setIsLoadingMore(true);
     const nextOffset = offset + limit;
-    
+
     // Remember current scroll height to maintain scroll position after inserting messages at the top
     const previousScrollHeight = scrollRef.current?.scrollHeight || 0;
 
     try {
-      const res = await axios.get(`/api/chat?device_id=${deviceId}&limit=${limit}&offset=${nextOffset}`);
+      const res = await axios.get(
+        `/api/chat?device_id=${deviceId}&limit=${limit}&offset=${nextOffset}`,
+      );
       const olderMsgs = res.data.data.messages;
-      
+
       if (olderMsgs.length < limit) {
         setHasMore(false);
       }
-      
+
       if (olderMsgs.length > 0) {
         setOffset(nextOffset);
         // Prepend older messages
         setMessages([...olderMsgs, ...messages]);
-        
+
         // Restore scroll position
         setTimeout(() => {
           if (scrollRef.current) {
             const newScrollHeight = scrollRef.current.scrollHeight;
-            scrollRef.current.scrollTop = newScrollHeight - previousScrollHeight;
+            scrollRef.current.scrollTop =
+              newScrollHeight - previousScrollHeight;
           }
         }, 0);
       }
@@ -177,12 +215,12 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
             <img
               src={fileUrl}
               alt={msg.content}
-              className="rounded-lg max-w-full h-auto max-h-48 object-cover border border-[var(--color-outline-variant)]"
+              className={`rounded-lg max-w-full h-auto max-h-48 object-cover border ${isMe ? "border-white/20" : "border-[var(--color-outline-variant)]"}`}
             />
             <a
               href={fileUrl}
               download={msg.content}
-              className="text-xs underline opacity-80 text-center hover:opacity-100 font-label-sm"
+              className={`text-xs underline text-center font-label-sm ${isMe ? "text-white/90 hover:text-white" : "opacity-80 hover:opacity-100"}`}
             >
               Download Image
             </a>
@@ -196,7 +234,7 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
           <a
             href={fileUrl}
             download={msg.content}
-            className="underline hover:opacity-80 break-all text-sm font-medium"
+            className={`underline break-all text-sm font-medium ${isMe ? "text-white hover:text-white/80" : "hover:opacity-80"}`}
           >
             {msg.content}
           </a>
@@ -207,12 +245,27 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
     let previewNode = null;
     if (msg.preview_data) {
       try {
-        const preview = typeof msg.preview_data === 'string' ? JSON.parse(msg.preview_data) : msg.preview_data;
+        const preview =
+          typeof msg.preview_data === "string"
+            ? JSON.parse(msg.preview_data)
+            : msg.preview_data;
         if (preview.title || preview.description) {
           previewNode = (
-            <div className="mt-2 text-sm border border-[var(--color-outline-variant)] rounded-lg p-2 bg-[var(--color-surface-container)] opacity-90 overflow-hidden">
-              {preview.title && <div className="font-semibold text-xs truncate mb-1">{preview.title}</div>}
-              {preview.description && <div className="text-[10px] text-[var(--color-on-surface-variant)] line-clamp-2">{preview.description}</div>}
+            <div
+              className={`mt-2 text-sm rounded-lg p-2 overflow-hidden ${isMe ? "border border-white/20 bg-black/20 text-white" : "border border-[var(--color-outline-variant)] bg-[var(--color-surface-container)] opacity-90"}`}
+            >
+              {preview.title && (
+                <div className="font-semibold text-xs truncate mb-1">
+                  {preview.title}
+                </div>
+              )}
+              {preview.description && (
+                <div
+                  className={`text-[10px] line-clamp-2 ${isMe ? "text-white/80" : "text-[var(--color-on-surface-variant)]"}`}
+                >
+                  {preview.description}
+                </div>
+              )}
             </div>
           );
         }
@@ -223,7 +276,9 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
 
     return (
       <div className="flex flex-col gap-1 relative">
-        <span className="wrap-break-word whitespace-pre-wrap">{msg.content}</span>
+        <span className="wrap-break-word whitespace-pre-wrap">
+          {msg.content}
+        </span>
         {previewNode}
       </div>
     );
@@ -246,21 +301,23 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
       )}
 
       {/* Header */}
-      <header className="h-20 px-[var(--spacing-margin-container)] flex items-center justify-between border-b border-[var(--color-outline-variant)]/30 bg-[var(--color-background)]/80 backdrop-blur-md z-10 shrink-0">
+      <header className="h-15 px-[var(--spacing-margin-container)] flex items-center justify-between border-b border-[var(--color-outline-variant)]/30 bg-[var(--color-background)]/80 backdrop-blur-md z-10 shrink-0">
         <div className="flex items-center gap-4">
           <div className="relative shrink-0">
             <div className="w-10 h-10 rounded-full border border-[var(--color-outline-variant)] flex items-center justify-center font-headline-md text-[var(--color-on-surface)] bg-[var(--color-surface-variant)] hidden md:flex">
               {deviceName.charAt(0).toUpperCase()}
             </div>
             {isDeviceOnline && (
-              <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[var(--color-background)] ${isChatOpen ? "bg-green-500" : "bg-blue-500"}`}></div>
+              <div
+                className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[var(--color-background)] ${isChatOpen ? "bg-green-500" : "bg-blue-500"}`}
+              ></div>
             )}
           </div>
           <div>
             <h2 className="font-headline-md text-[var(--text-headline-md)] text-[var(--color-primary)] flex items-center gap-2">
               {deviceName}
             </h2>
-            
+
             <p className="font-label-sm text-[var(--color-on-surface-variant)] text-[10px] mt-0.5 font-mono opacity-60">
               ID: {deviceId}
             </p>
@@ -290,8 +347,8 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
 
       {/* Messages Area */}
       <div
-        className="flex-1 overflow-y-auto p-[var(--spacing-margin-container)] flex flex-col gap-2 z-0 pb-32 custom-scrollbar relative bg-[url('/chat-bg-dark.png')] [.light_&]:bg-[url('/chat-bg.png')]"
-        style={{ backgroundSize: '400px', backgroundRepeat: 'repeat' }}
+        className="flex-1 overflow-y-auto p-[var(--spacing-margin-container)] flex flex-col gap-2 z-0 pb-16 custom-scrollbar relative bg-[url('/chat-bg-dark.png')] [.light_&]:bg-[url('/chat-bg.png')]"
+        style={{ backgroundSize: "400px", backgroundRepeat: "repeat" }}
         ref={scrollRef}
         onScroll={handleScroll}
       >
@@ -299,33 +356,72 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
           // 'me' = sent from this web UI
           // anything else ('android-xxx', 'pc', etc.) = received from phone
           const isMe = msg.sender === "me";
+          // Shows badge on the first message (when conversation began)
+          // and whenever the day changes from the previous message
+          const showDateHeader =
+            idx === 0 ||
+            dateMaker(msg.timestamp) !==
+              dateMaker(messages[idx - 1]?.timestamp);
           return (
-            <div
-              key={msg.id ? `msg-${msg.id}` : `fallback-${idx}`}
-              className={`flex flex-col max-w-[85%] md:max-w-[70%] gap-1 group relative ${isMe ? "self-end items-end" : "self-start"}`}
-            >
-              <div
-                className={`px-4 py-0.5 rounded-2xl font-body-md leading-relaxed cursor-pointer ${enableDoubleClickCopy ? 'select-none' : ''} ${isMe ? "border border-[var(--color-outline-variant)]/50 bg-[var(--color-surface-container-lowest)] text-[var(--color-on-surface)] rounded-tr-sm shadow-sm" : "bg-[var(--color-surface-container-high)] text-[var(--color-primary)] rounded-tl-sm border border-transparent"}`}
-                onDoubleClick={() => {
-                  if (enableDoubleClickCopy && msg.content) {
-                    navigator.clipboard.writeText(msg.content);
-                    const id = msg.id || msg.localId || `fallback-${idx}`;
-                    setCopiedMessageId(id);
-                    setTimeout(() => setCopiedMessageId(null), 1500);
-                  }
-                }}
-                title={enableDoubleClickCopy ? "Double-click to copy" : ""}
-              >
-                {renderBubbleContent(msg, isMe)}
-              </div>
-              
-              {copiedMessageId === (msg.id || msg.localId || `fallback-${idx}`) && (
-                <div className={`absolute top-1/2 -translate-y-1/2 ${isMe ? "right-full mr-2" : "left-full ml-2"} bg-[var(--color-surface-variant)] text-[var(--color-primary)] text-[11px] px-2 py-0.25  rounded-sm shadow-sm border border-[var(--color-outline-variant)]/50 animate-in fade-in zoom-in duration-300 z-10 pointer-events-none flex items-center gap-1 whitespace-nowrap`}>
-                  <span className="material-symbols-outlined text-[14px]">check</span>
-                  copied!
+            <React.Fragment key={msg.id ? `msg-${msg.id}` : `fallback-${idx}`}>
+              {/* Centered Date Badge */}
+              {showDateHeader && msg.timestamp && (
+                <div className="self-center my-3 select-none">
+                  <span className="px-3 py-1 rounded-md text-[12px] text-white  font-medium bg-[#1e2024]/90 text-[var(--color-on-surface-variant)] border border-white/5 shadow-sm">
+                    {dateMaker(msg.timestamp)}
+                  </span>
                 </div>
               )}
-            </div>
+
+              {/* Message Bubble */}
+              <div
+                className={`flex flex-col max-w-[85%] md:max-w-[70%] gap-1 group relative ${isMe ? "self-end items-end" : "self-start"}`}
+              >
+                <div
+                  className={`flex items-end gap-1.5 py-1 rounded-2xl font-body-md leading-relaxed cursor-pointer ${
+                    enableDoubleClickCopy ? "select-none" : ""
+                  } ${
+                    isMe
+                      ? "bg-[#1E9CF1] text-white rounded-tr-sm shadow-sm pl-3.5 pr-2"
+                      : "bg-[var(--color-surface-container-high)] text-[var(--color-on-surface)] rounded-tl-sm border border-transparent pl-2.5 pr-3.5"
+                  }`}
+                  onDoubleClick={() => {
+                    if (enableDoubleClickCopy && msg.content) {
+                      navigator.clipboard.writeText(msg.content);
+                      const id = msg.id || `fallback-${idx}`;
+                      setCopiedMessageId(id);
+                      setTimeout(() => setCopiedMessageId(null), 1500);
+                    }
+                  }}
+                  title={enableDoubleClickCopy ? "Double-click to copy" : ""}
+                >
+                  {renderBubbleContent(msg, isMe)}
+
+                  {msg.timestamp && (
+                    <div
+                      className={`text-[9px] shrink-0 pb-0.5 select-none ${
+                        isMe
+                          ? "text-white/80"
+                          : "text-[var(--color-on-surface-variant)]"
+                      }`}
+                    >
+                      {formatMessageTime(msg.timestamp)}
+                    </div>
+                  )}
+                </div>
+
+                {copiedMessageId === (msg.id || `fallback-${idx}`) && (
+                  <div
+                    className={`absolute top-1/2 -translate-y-1/2 ${isMe ? "right-full mr-2" : "left-full ml-2"} bg-[var(--color-surface-variant)] text-[var(--color-primary)] text-[11px] px-2 py-0.25  rounded-sm shadow-sm border border-[var(--color-outline-variant)]/50 animate-in fade-in zoom-in duration-300 z-10 pointer-events-none flex items-center gap-1 whitespace-nowrap`}
+                  >
+                    <span className="material-symbols-outlined text-[14px]">
+                      check
+                    </span>
+                    copied!
+                  </div>
+                )}
+              </div>
+            </React.Fragment>
           );
         })}
 
@@ -333,26 +429,39 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
         {pendingQueue
           .filter((p) => p.payload.device_id === deviceId)
           .map((p) => (
-            <div key={p.localId} className="flex flex-col max-w-[85%] md:max-w-[70%] gap-1 self-end items-end">
+            <div
+              key={p.localId}
+              className="flex flex-col max-w-[85%] md:max-w-[70%] gap-1 self-end items-end"
+            >
               <div
                 className={`px-4 py-1.5 rounded-2xl rounded-tr-sm font-body-md leading-relaxed flex items-center gap-2 ${
-                  p.status === 'failed'
-                    ? 'border border-[var(--color-error)]/60 bg-[var(--color-error-container)]/20 text-[var(--color-on-surface)]'
-                    : 'border border-[var(--color-outline-variant)]/30 bg-[var(--color-surface-container-lowest)]/60 text-[var(--color-on-surface)] opacity-60'
+                  p.status === "failed"
+                    ? "border border-[var(--color-error)]/60 bg-[var(--color-error-container)]/20 text-[var(--color-on-surface)]"
+                    : "bg-[#1E9CF1]/80 text-white rounded-tr-sm opacity-80"
                 }`}
               >
-                <span className="flex-1 wrap-break-word whitespace-pre-wrap text-sm">{p.payload.content}</span>
-                {p.status === 'failed' ? (
+                <span className="flex-1 wrap-break-word whitespace-pre-wrap text-sm">
+                  {p.payload.content}
+                </span>
+                <span className="text-[10px] text-white/70 ml-auto">
+                  {new Date().toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+                {p.status === "failed" ? (
                   <button
                     onClick={() => retryMessage(p.localId)}
                     title="Retry sending"
                     className="flex items-center gap-1 text-[var(--color-error)] hover:opacity-80 transition-opacity shrink-0"
                   >
-                    <span className="material-symbols-outlined text-[14px]">error</span>
+                    <span className="material-symbols-outlined text-[14px]">
+                      error
+                    </span>
                     <span className="text-[10px] font-medium">Retry</span>
                   </button>
                 ) : (
-                  <span className="material-symbols-outlined text-[14px] shrink-0 animate-pulse text-[var(--color-on-surface-variant)]">
+                  <span className="material-symbols-outlined text-[14px] shrink-0 animate-pulse text-white/90">
                     schedule
                   </span>
                 )}
@@ -362,34 +471,42 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
       </div>
 
       {/* Input Area */}
-      <div className="absolute bottom-0 left-0 right-0 p-[var(--spacing-margin-container)] pt-4 bg-gradient-to-t from-[var(--color-background)] via-[var(--color-background)] to-transparent z-20">
+      <div className="absolute bottom-0 left-0 right-0 z-20 px-3 pb-3 pt-1">
         <form
           onSubmit={handleSendText}
-          className="max-w-full mx-auto flex items-end gap-2 bg-[var(--color-surface-container)] border border-[var(--color-outline-variant)]/50 p-2 rounded-2xl focus-within:border-[var(--color-outline-variant)] transition-all"
+          className="flex items-center gap-2 px-2 py-1.5 bg-[#1e2024] rounded-full border border-white/5 focus-within:border-white/15 transition-all shadow-lg"
         >
+          {/* Hidden file input */}
           <input
             type="file"
             ref={fileInputRef}
             onChange={handleFileSelect}
             className="hidden"
           />
+
+          {/* Attach button */}
           <button
             type="button"
             disabled={uploading}
             onClick={() => fileInputRef.current?.click()}
-            className="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-surface-variant)] transition-colors disabled:opacity-50"
+            className="w-9 h-9 ml-1 shrink-0 rounded-full flex items-center justify-center text-[var(--color-on-surface-variant)] hover:text-white hover:bg-white/10 transition-colors disabled:opacity-40"
+            title="Attach file"
           >
-            <span className="material-symbols-outlined">attach_file</span>
+            <span className="material-symbols-outlined text-[20px]">
+              attach_file
+            </span>
           </button>
 
+          {/* Text input — grows with content */}
           <textarea
-            className="flex-1 max-h-32 min-h-10 bg-transparent border-none focus:ring-0 text-[var(--color-primary)] font-body-md placeholder:text-[var(--color-on-surface-variant)] resize-none py-2 px-2 overflow-y-auto custom-scrollbar outline-none"
+            className="flex-1 bg-transparent border-none focus:ring-0 outline-none text-white text-[15px] placeholder:text-[#666] resize-none py-2 px-2 overflow-y-auto custom-scrollbar leading-relaxed"
+            style={{ minHeight: "26px", maxHeight: "120px" }}
             onInput={(e) => {
-              const target = e.target as HTMLTextAreaElement;
-              target.style.height = "";
-              target.style.height = target.scrollHeight + "px";
+              const t = e.target as HTMLTextAreaElement;
+              t.style.height = "";
+              t.style.height = Math.min(t.scrollHeight, 120) + "px";
             }}
-            value={uploading ? "Uploading file..." : input}
+            value={uploading ? "Uploading file…" : input}
             disabled={uploading}
             onChange={(e) => setInput(e.target.value)}
             onPaste={handlePaste}
@@ -403,12 +520,26 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
             rows={1}
           />
 
+          {/* Blue circular send button with upward arrow */}
           <button
             type="submit"
-            disabled={uploading}
-            className="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-[var(--color-primary)] bg-[var(--color-surface-variant)] hover:bg-[var(--color-outline-variant)] transition-colors disabled:opacity-50"
+            disabled={uploading || !input.trim()}
+            className="w-9 h-9 mr-0.5 shrink-0 rounded-full flex items-center justify-center bg-[#1E9CF1] hover:bg-[#1985ce] active:scale-95 transition-all disabled:opacity-40 disabled:hover:bg-[#1E9CF1] disabled:active:scale-100 shadow-md"
+            title="Send"
           >
-            <span className="material-symbols-outlined text-[20px]">send</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-5 h-5 text-white"
+            >
+              <path d="M12 19V5" />
+              <polyline points="5 12 12 5 19 12" />
+            </svg>
           </button>
         </form>
       </div>

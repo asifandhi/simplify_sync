@@ -8,9 +8,10 @@ import DeviceCard from './DeviceCard';
 interface Props {
   onSelectDevice?: (deviceId: string, deviceName: string) => void;
   selectedDeviceId?: string | null;
+  searchQuery?: string;
 }
 
-export default function DeviceManager({ onSelectDevice, selectedDeviceId }: Props) {
+export default function DeviceManager({ onSelectDevice, selectedDeviceId, searchQuery = '' }: Props) {
   const { devices, setDevices } = useDeviceStore();
   const [loading, setLoading] = useState(true);
 
@@ -31,24 +32,37 @@ export default function DeviceManager({ onSelectDevice, selectedDeviceId }: Prop
     fetchDevices();
   }, [setDevices]);
 
-  if (loading) return <div className="p-4 text-center text-[var(--color-on-surface-variant)] text-sm">Loading...</div>;
+  if (loading) return (
+    <div className="p-4 text-center text-[var(--color-on-surface-variant)] text-sm">Loading...</div>
+  );
 
-  return (
-    <div className="flex flex-col gap-1">
-      {devices.length === 0 ? (
-        <div className="p-8 text-center text-[var(--color-on-surface-variant)] text-sm italic">
-          No devices paired yet.
-        </div>
-      ) : (
-        devices.map((device) => (
-          <DeviceCard 
-            key={device.device_id} 
-            device={device} 
-            isActive={device.device_id === selectedDeviceId}
-            onClick={() => onSelectDevice && onSelectDevice(device.device_id, device.device_name)}
-          />
-        ))
-      )}
+  const filtered = searchQuery.trim()
+    ? devices.filter(d => d.device_name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : devices;
+
+  if (devices.length === 0) return (
+    <div className="flex flex-col items-center justify-center gap-2 py-16 px-6 text-center">
+      <span className="material-symbols-outlined text-[36px] text-[var(--color-on-surface-variant)]">devices</span>
+      <p className="text-[var(--color-on-surface-variant)] text-sm">No devices paired yet.</p>
     </div>
   );
-}
+
+  if (filtered.length === 0) return (
+    <div className="py-10 text-center text-[var(--color-on-surface-variant)] text-sm">
+      No results for &ldquo;{searchQuery}&rdquo;
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col">
+      {filtered.map((device) => (
+        <DeviceCard
+          key={device.device_id}
+          device={device}
+          isActive={device.device_id === selectedDeviceId}
+          onClick={() => onSelectDevice && onSelectDevice(device.device_id, device.device_name)}
+        />
+      ))}
+    </div>
+  );
+}

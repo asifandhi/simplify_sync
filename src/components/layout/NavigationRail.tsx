@@ -57,13 +57,7 @@ export default function NavigationRail() {
             {theme === "dark" ? "dark_mode" : "light_mode"}
           </span>
         </button>
-        <Link
-          href="/?view=pairing"
-          aria-label="New Conversation"
-          className="w-8 h-8 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-[var(--color-on-primary)] hover:bg-[var(--color-primary-container)] transition-colors shadow-[0_0_10px_rgba(255,255,255,0.1)] hover:shadow-[0_0_15px_rgba(255,255,255,0.2)]"
-        >
-          <span className="material-symbols-outlined text-[18px]">add</span>
-        </Link>
+        
         <button
           aria-label="User Profile"
           className="w-8 h-8 rounded-full overflow-hidden border border-[var(--color-outline-variant)] hover:border-[var(--color-outline)] transition-colors cursor-pointer ring-2 ring-transparent focus:ring-[var(--color-surface-variant)]"
