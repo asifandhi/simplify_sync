@@ -22,6 +22,7 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
   const [input, setInput] = useState("");
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | number | null>(null);
 
   const { syncLocalClipboard, error } = useClipboardSync(socket, deviceId);
 
@@ -165,7 +166,7 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
     }
   };
 
-  const renderBubbleContent = (msg: any) => {
+  const renderBubbleContent = (msg: any, isMe: boolean = false) => {
     if (msg.content_type === "file") {
       const isImage = msg.content?.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null;
       const fileUrl = `/api/file?path=${msg.file_path}`;
@@ -221,16 +222,7 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
     }
 
     return (
-      <div 
-        className="flex flex-col gap-1 cursor-pointer" 
-        onDoubleClick={() => {
-          if (enableDoubleClickCopy && msg.content) {
-            navigator.clipboard.writeText(msg.content);
-            // Optional: You can add a toast notification here if you have a toast system
-          }
-        }}
-        title={enableDoubleClickCopy ? "Double-click to copy" : ""}
-      >
+      <div className="flex flex-col gap-1 relative">
         <span className="wrap-break-word whitespace-pre-wrap">{msg.content}</span>
         {previewNode}
       </div>
@@ -310,13 +302,29 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
           return (
             <div
               key={msg.id ? `msg-${msg.id}` : `fallback-${idx}`}
-              className={`flex flex-col max-w-[85%] md:max-w-[70%] gap-1 group ${isMe ? "self-end items-end" : "self-start"}`}
+              className={`flex flex-col max-w-[85%] md:max-w-[70%] gap-1 group relative ${isMe ? "self-end items-end" : "self-start"}`}
             >
               <div
-                className={`px-4 py-0.5 rounded-2xl font-body-md leading-relaxed ${isMe ? "border border-[var(--color-outline-variant)]/50 bg-[var(--color-surface-container-lowest)] text-[var(--color-on-surface)] rounded-tr-sm shadow-sm" : "bg-[var(--color-surface-container-high)] text-[var(--color-primary)] rounded-tl-sm border border-transparent"}`}
+                className={`px-4 py-0.5 rounded-2xl font-body-md leading-relaxed cursor-pointer ${enableDoubleClickCopy ? 'select-none' : ''} ${isMe ? "border border-[var(--color-outline-variant)]/50 bg-[var(--color-surface-container-lowest)] text-[var(--color-on-surface)] rounded-tr-sm shadow-sm" : "bg-[var(--color-surface-container-high)] text-[var(--color-primary)] rounded-tl-sm border border-transparent"}`}
+                onDoubleClick={() => {
+                  if (enableDoubleClickCopy && msg.content) {
+                    navigator.clipboard.writeText(msg.content);
+                    const id = msg.id || msg.localId || `fallback-${idx}`;
+                    setCopiedMessageId(id);
+                    setTimeout(() => setCopiedMessageId(null), 1500);
+                  }
+                }}
+                title={enableDoubleClickCopy ? "Double-click to copy" : ""}
               >
-                {renderBubbleContent(msg)}
+                {renderBubbleContent(msg, isMe)}
               </div>
+              
+              {copiedMessageId === (msg.id || msg.localId || `fallback-${idx}`) && (
+                <div className={`absolute top-1/2 -translate-y-1/2 ${isMe ? "right-full mr-2" : "left-full ml-2"} bg-[var(--color-surface-variant)] text-[var(--color-primary)] text-[11px] px-2 py-0.25  rounded-sm shadow-sm border border-[var(--color-outline-variant)]/50 animate-in fade-in zoom-in duration-300 z-10 pointer-events-none flex items-center gap-1 whitespace-nowrap`}>
+                  <span className="material-symbols-outlined text-[14px]">check</span>
+                  copied!
+                </div>
+              )}
             </div>
           );
         })}

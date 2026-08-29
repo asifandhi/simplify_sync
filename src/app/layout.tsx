@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { Toaster } from "@/components/ui/sonner";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -42,6 +43,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased h-screen overflow-hidden bg-gradient-to-br from-[#f5f5f7] to-[#e4e4e9] dark:from-[#000000] dark:to-[#1a1a1c]">
         {children}
+        <Toaster position="bottom-left" />
       </body>
     </html>
   );
