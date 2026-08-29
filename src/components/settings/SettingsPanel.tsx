@@ -2,12 +2,14 @@
 
 import React, { useRef, useState } from 'react';
 import { useUserStore } from '@/store/userStore';
+import { Switch } from '@/components/ui/switch';
 
 export default function SettingsPanel() {
   const { 
     profileImage, setProfileImage, 
     theme, setTheme, 
-    autoSyncClipboard, setAutoSyncClipboard 
+    autoSyncClipboard, setAutoSyncClipboard,
+    enableDoubleClickCopy,setEnableDoubleClickCopy 
   } = useUserStore();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -82,12 +84,23 @@ export default function SettingsPanel() {
               <p className="text-[var(--color-primary)] font-medium text-sm">Auto-Sync Clipboard</p>
               <p className="text-[var(--color-on-surface-variant)] text-xs mt-1">Automatically send copied text to paired devices.</p>
             </div>
-            <button 
-              onClick={handleToggleAutoSync}
-              className={`relative flex items-center justify-center w-12 h-6 rounded-full transition-colors border ${autoSyncClipboard ? 'bg-[var(--color-primary)] border-[var(--color-primary)]' : 'bg-[var(--color-surface-variant)] border-[var(--color-outline-variant)]'}`}
-            >
-              <div className={`absolute left-1 w-4 h-4 rounded-full transition-transform ${autoSyncClipboard ? 'translate-x-[22px] bg-[var(--color-surface)]' : 'translate-x-0 bg-[var(--color-on-surface-variant)]'}`}></div>
-            </button>
+            <Switch
+              checked={autoSyncClipboard}
+              onCheckedChange={handleToggleAutoSync}
+              id="auto-sync-mode"
+            />
+          </div>
+
+          <div className="flex items-center justify-between py-4 border-t border-[var(--color-outline-variant)]/20 mt-2 pt-6">
+            <div>
+              <p className="text-[var(--color-primary)] font-medium text-sm">Double-Click to Copy</p>
+              <p className="text-[var(--color-on-surface-variant)] text-xs mt-1">Double-click a message bubble in chat to instantly copy it.</p>
+            </div>
+            <Switch
+              checked={enableDoubleClickCopy}
+              onCheckedChange={(checked) => setEnableDoubleClickCopy(checked)}
+              id="double-click-mode"
+            />
           </div>
         </section>
       </div>

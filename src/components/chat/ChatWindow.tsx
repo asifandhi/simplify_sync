@@ -1,4 +1,5 @@
 import { useChatStore } from "@/store/chatStore";
+import { useUserStore } from "@/store/userStore";
 import axios from "axios";
 import React, { useEffect, useRef, useState } from "react";
 import { useClipboardSync } from "@/hooks/useClipboardSync";
@@ -11,6 +12,7 @@ interface ChatWindowProps {
 }
 
 function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
+  const enableDoubleClickCopy = useUserStore((s) => s.enableDoubleClickCopy);
   const isDeviceOnline = useChatStore((s) => s.isDeviceOnline);
   const isChatOpen = useChatStore((s) => s.isChatOpen);
   const pendingQueue = useChatStore((s) => s.pendingQueue);
@@ -219,7 +221,16 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
     }
 
     return (
-      <div className="flex flex-col gap-1">
+      <div 
+        className="flex flex-col gap-1 cursor-pointer" 
+        onDoubleClick={() => {
+          if (enableDoubleClickCopy && msg.content) {
+            navigator.clipboard.writeText(msg.content);
+            // Optional: You can add a toast notification here if you have a toast system
+          }
+        }}
+        title={enableDoubleClickCopy ? "Double-click to copy" : ""}
+      >
         <span className="wrap-break-word whitespace-pre-wrap">{msg.content}</span>
         {previewNode}
       </div>
