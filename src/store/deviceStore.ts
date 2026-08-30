@@ -5,6 +5,7 @@ interface Device {
   device_name: string;
   last_active: string;
   is_trusted: number;
+  profile_image?: string;
 }
 
 interface DeviceStore {

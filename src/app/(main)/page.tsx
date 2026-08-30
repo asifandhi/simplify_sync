@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
+import React, { useState, Suspense, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import DeviceManager from "@/components/devices/DeviceManager";
 import ChatWindow from "@/components/chat/ChatWindow";
@@ -11,9 +11,16 @@ import { useChatStore } from "@/store/chatStore";
 function DashboardContent() {
   const searchParams = useSearchParams();
   const view = searchParams.get("view") || "chat";
-  const [selectedDevice, setSelectedDevice] = useState<{ id: string; name: string } | null>(null);
+  const [selectedDevice, setSelectedDevice] = useState<{ id: string; name: string; profileImage?: string } | null>(null);
   const [search, setSearch] = useState("");
   const { isConnected } = useChatStore();
+
+  const handleDeviceSelect = useCallback((id: string, name: string, profileImage?: string) => {
+    setSelectedDevice({ id, name, profileImage });
+    if (view !== "chat") {
+      window.history.pushState(null, "", "/?view=chat");
+    }
+  }, [view]);
 
   return (
     <>
@@ -70,12 +77,7 @@ function DashboardContent() {
           <DeviceManager
             selectedDeviceId={selectedDevice?.id}
             searchQuery={search}
-            onSelectDevice={(id, name) => {
-              setSelectedDevice({ id, name });
-              if (view !== "chat") {
-                window.history.pushState(null, "", "/?view=chat");
-              }
-            }}
+            onSelectDevice={handleDeviceSelect}
           />
         </div>
       </aside>
@@ -99,7 +101,7 @@ function DashboardContent() {
 
           {view === "chat" && (
             selectedDevice ? (
-              <ChatWindow deviceId={selectedDevice.id} deviceName={selectedDevice.name} />
+              <ChatWindow deviceId={selectedDevice.id} deviceName={selectedDevice.name} profileImage={selectedDevice.profileImage} />
             ) : (
               /* Empty state — matches the screenshot */
               <div className="flex-1 flex flex-col items-center justify-center gap-5 p-8">

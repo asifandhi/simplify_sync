@@ -1,5 +1,6 @@
 import axios from "axios";
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useDeviceStore } from "@/store/deviceStore";
 
 interface Props {
@@ -7,6 +8,7 @@ interface Props {
     device_id: string;
     device_name: string;
     last_active: string;
+    profile_image?: string;
   };
   isActive?: boolean;
   onClick?: () => void;
@@ -94,11 +96,15 @@ export default function DeviceCard({ device, isActive, onClick }: Props) {
         }`}
       >
         {/* Avatar */}
-        <div
-          className={`w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-[18px] ${avatarColor(device.device_name)}`}
-        >
-          {device.device_name.charAt(0).toUpperCase()}
-        </div>
+        {device.profile_image ? (
+          <img src={device.profile_image} alt={device.device_name} className="w-12 h-12 rounded-full flex-shrink-0 object-cover" />
+        ) : (
+          <div
+            className={`w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-[18px] ${avatarColor(device.device_name)}`}
+          >
+            {device.device_name.charAt(0).toUpperCase()}
+          </div>
+        )}
 
         {/* Text */}
         <div className="flex-1 min-w-0">
@@ -122,28 +128,34 @@ export default function DeviceCard({ device, isActive, onClick }: Props) {
       <div className="mx-4 h-px bg-[var(--color-outline-variant)]/20" />
 
       {/* Right-click Context Menu */}
-      {contextMenu && (
-        <div
-          ref={menuRef}
-          style={{ top: contextMenu.y, left: contextMenu.x }}
-          className="fixed z-[9999] w-[220px] rounded-2xl overflow-hidden shadow-2xl border border-white/10"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="bg-[#1e1e1e] py-1.5">
-            {/* Delete — red highlight row */}
-            <button
-              onClick={handleRevoke}
-              className="w-full flex items-center gap-3 mx-1.5 px-3 py-2.5 text-[14px] text-red-800 rounded-xl transition-colors hover:bg-[#3a1a1a]"
-              style={{ width: "calc(100% - 12px)" }}
-            >
-              <span className="material-symbols-outlined text-[18px] text-red-800">
-                delete
-              </span>
-              Delete conversation
-            </button>
-          </div>
-        </div>
-      )}
+      {contextMenu &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              top: Math.max(10, Math.min(contextMenu.y, window.innerHeight - 80)),
+              left: Math.max(10, Math.min(contextMenu.x, window.innerWidth - 230)),
+            }}
+            className="fixed z-[99999] w-[220px] rounded-2xl overflow-hidden shadow-2xl border border-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-[#1e1e1e] py-1.5">
+              {/* Delete — red highlight row */}
+              <button
+                onClick={handleRevoke}
+                className="w-full flex items-center gap-3 mx-1.5 px-3 py-2.5 text-[14px] text-red-400 rounded-xl transition-colors hover:bg-[#3a1a1a]"
+                style={{ width: "calc(100% - 12px)" }}
+              >
+                <span className="material-symbols-outlined text-[18px] text-red-400">
+                  delete
+                </span>
+                Delete conversation
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
     </>
   );
 }

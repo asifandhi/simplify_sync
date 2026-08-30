@@ -2,25 +2,28 @@ import { useChatStore } from "@/store/chatStore";
 import { useUserStore } from "@/store/userStore";
 import axios from "axios";
 import React, { useEffect, useRef, useState } from "react";
-import { useClipboardSync } from "@/hooks/useClipboardSync";
-import { isContext } from "vm";
-import { Divide } from "lucide-react";
+
 
 interface ChatWindowProps {
   deviceId: string;
   deviceName: string;
+  profileImage?: string;
 }
 
 function formatMessageTime(timestamp?: string): string {
   if (!timestamp) return "";
-  const date = new Date(timestamp);
+  // SQLite returns "YYYY-MM-DD HH:MM:SS" in UTC. Convert to ISO 8601 UTC.
+  const isoString = timestamp.includes('T') ? timestamp : timestamp.replace(' ', 'T') + 'Z';
+  const date = new Date(isoString);
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function dateMaker(date?: string | Date): string {
   if (!date) return "";
 
-  const inputDate = new Date(date);
+  const timestamp = typeof date === 'string' ? date : date.toISOString();
+  const isoString = timestamp.includes('T') ? timestamp : timestamp.replace(' ', 'T') + 'Z';
+  const inputDate = new Date(isoString);
   if (isNaN(inputDate.getTime())) return ""; // Handle invalid date strings
 
   const now = new Date();
@@ -39,14 +42,20 @@ function dateMaker(date?: string | Date): string {
     year: "numeric",
   });
 }
-function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
+function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
   const enableDoubleClickCopy = useUserStore((s) => s.enableDoubleClickCopy);
+
   const isDeviceOnline = useChatStore((s) => s.isDeviceOnline);
+
   const isChatOpen = useChatStore((s) => s.isChatOpen);
+
   const pendingQueue = useChatStore((s) => s.pendingQueue);
+
   const retryMessage = useChatStore((s) => s.retryMessage);
+
   const { messages, connectSocket, setMessages, sendMessage, socket } =
     useChatStore();
+
   const [input, setInput] = useState("");
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -54,9 +63,34 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
     string | number | null
   >(null);
 
-  const { syncLocalClipboard, error } = useClipboardSync(socket, deviceId);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Track if scroll-down button is visible and how many messages arrived while scrolled up
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [unreadBelowCount, setUnreadBelowCount] = useState(0);
+
+  // Ref to track the last message ID to avoid triggering on pagination (prepend)
+  const lastMessageIdRef = useRef<string | number | null>(null);
+
+  // Helper: check if user is within 150px of the bottom
+  const isNearBottom = () => {
+    if (!scrollRef.current) return true;
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    return scrollHeight - scrollTop - clientHeight < 150;
+  };
+
+  // Helper: smooth scroll to the bottom
+  const scrollToBottom = (smooth = true) => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: smooth ? "smooth" : "auto",
+      });
+      setShowScrollBottom(false);
+      setUnreadBelowCount(0);
+    }
+  };
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Pagination states
@@ -87,15 +121,54 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
   }, [deviceId, connectSocket, setMessages]);
 
   const handleScroll = () => {
-    if (
-      scrollRef.current &&
-      scrollRef.current.scrollTop === 0 &&
-      hasMore &&
-      !isLoadingMore
-    ) {
+    if (!scrollRef.current) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+
+    // 1. Pagination: Load more when reaching the top
+    if (scrollTop === 0 && hasMore && !isLoadingMore) {
       loadMore();
     }
+
+    // 2. If scrolled near the bottom (< 100px), hide arrow and reset counter
+    if (distanceFromBottom < 100) {
+      setShowScrollBottom(false);
+      setUnreadBelowCount(0);
+    } else if (distanceFromBottom > 200) {
+      // If scrolled further up (> 200px), show the arrow button
+      setShowScrollBottom(true);
+    }
   };
+
+  useEffect(() => {
+    if (messages.length === 0) return;
+
+    const lastMsg = messages[messages.length - 1];
+    const lastId = lastMsg.id || `${lastMsg.sender}-${lastMsg.timestamp}`;
+
+    // Only trigger if a NEW message was appended to the bottom (ignores prepended older messages)
+    if (lastId !== lastMessageIdRef.current) {
+      lastMessageIdRef.current = lastId;
+
+      const isMe = lastMsg.sender === "me";
+
+      if (isMe) {
+        // Sent message: ALWAYS auto-scroll immediately to bottom
+        setTimeout(() => scrollToBottom(true), 50);
+      } else {
+        // Arriving message:
+        if (isNearBottom()) {
+          // Near the end: auto-scroll down smoothly
+          setTimeout(() => scrollToBottom(true), 50);
+        } else {
+          // Scrolled above reading history: stay where you are, show arrow & increment count
+          setShowScrollBottom(true);
+          setUnreadBelowCount((prev) => prev + 1);
+        }
+      }
+    }
+  }, [messages]);
 
   const loadMore = async () => {
     setIsLoadingMore(true);
@@ -303,10 +376,14 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
       {/* Header */}
       <header className="h-15 px-[var(--spacing-margin-container)] flex items-center justify-between border-b border-[var(--color-outline-variant)]/30 bg-[var(--color-background)]/80 backdrop-blur-md z-10 shrink-0">
         <div className="flex items-center gap-4">
-          <div className="relative shrink-0">
-            <div className="w-10 h-10 rounded-full border border-[var(--color-outline-variant)] flex items-center justify-center font-headline-md text-[var(--color-on-surface)] bg-[var(--color-surface-variant)] hidden md:flex">
-              {deviceName.charAt(0).toUpperCase()}
-            </div>
+          <div className="relative shrink-0 hidden md:block">
+            {profileImage ? (
+              <img src={profileImage} alt={deviceName} className="w-10 h-10 rounded-full object-cover border border-[var(--color-outline-variant)]" />
+            ) : (
+              <div className="w-10 h-10 rounded-full border border-[var(--color-outline-variant)] flex items-center justify-center font-headline-md text-[var(--color-on-surface)] bg-[var(--color-surface-variant)]">
+                {deviceName.charAt(0).toUpperCase()}
+              </div>
+            )}
             {isDeviceOnline && (
               <div
                 className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[var(--color-background)] ${isChatOpen ? "bg-green-500" : "bg-blue-500"}`}
@@ -325,21 +402,12 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          {error && (
-            <span className="text-xs text-[var(--color-error)] font-medium mr-2">
-              {error}
-            </span>
-          )}
           <button
-            onClick={syncLocalClipboard}
-            className="h-10 px-4 rounded-full flex items-center justify-center gap-2 text-[var(--color-primary)] bg-[var(--color-surface-container)] hover:bg-[var(--color-surface-container-high)] transition-colors border border-[var(--color-outline-variant)]/50"
-            title="Push local clipboard to this device"
+            className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container)] transition-colors"
+            title="More options"
           >
-            <span className="material-symbols-outlined text-[18px]">
-              content_copy
-            </span>
-            <span className="text-sm font-medium hidden sm:block">
-              Sync Clipboard
+            <span className="material-symbols-outlined text-[22px]">
+              more_vert
             </span>
           </button>
         </div>
@@ -469,6 +537,27 @@ function ChatWindow({ deviceId, deviceName }: ChatWindowProps) {
             </div>
           ))}
       </div>
+
+      {/* Floating Scroll to Bottom Arrow */}
+      {showScrollBottom && (
+        <button
+          type="button"
+          onClick={() => scrollToBottom(true)}
+          className="absolute bottom-20 right-6 z-30 w-10 h-10 rounded-full bg-[#1e2024] hover:bg-[#282b30] border border-white/10 shadow-2xl flex items-center justify-center text-white/90 hover:text-white transition-all active:scale-95"
+          title="Scroll to bottom"
+        >
+          <span className="material-symbols-outlined text-[24px]">
+            keyboard_arrow_down
+          </span>
+
+          {/* Unread badge if 1 or more messages arrived below */}
+          {unreadBelowCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 bg-[#1E9CF1] text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center shadow-md">
+              {unreadBelowCount}
+            </span>
+          )}
+        </button>
+      )}
 
       {/* Input Area */}
       <div className="absolute bottom-0 left-0 right-0 z-20 px-3 pb-3 pt-1">

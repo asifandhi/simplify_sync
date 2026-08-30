@@ -21,8 +21,17 @@ export function connectDB() {
             last_active   DATETIME,
             is_trusted    INTEGER DEFAULT 0,
             created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
-        );
-            
+        );`
+    );
+
+    // Migration for profile_image
+    try {
+      db.exec(`ALTER TABLE devices ADD COLUMN profile_image TEXT;`);
+    } catch (e) {
+      // Ignore if already exists
+    }
+
+    db.exec(`
        CREATE TABLE IF NOT EXISTS chat_history (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
             device_id     TEXT NOT NULL,
@@ -101,7 +110,7 @@ export function insertChatMessage(data: chatMessageInput) {
       console.log("This is the result ");
       console.table(result);
     }
-    return { id: result.lastInsertRowid, ...data };
+      return db.prepare('SELECT * FROM chat_history WHERE id = ?').get(result.lastInsertRowid) as any;
   } catch (error) {
     console.error("Error inserting chat message:", error);
   }
@@ -181,6 +190,11 @@ export function insertDevice(data:DeviceInput) {
     VALUES (@device_id, @device_name, @session_token, 1, CURRENT_TIMESTAMP, 0)
   `);
   return stmt.run(data);
+}
+
+export function updateDeviceProfileImage(device_id: string, profile_image: string) {
+  const stmt = db.prepare(`UPDATE devices SET profile_image = ? WHERE device_id = ?`);
+  return stmt.run(profile_image, device_id);
 }
 
 export function deleteDevice(deviceId: string) {

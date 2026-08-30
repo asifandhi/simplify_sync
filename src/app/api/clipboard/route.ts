@@ -11,6 +11,9 @@ export const POST = asyncHandler(async (request: Request) => {
 
   try {
     const io = getIO();
+    if (!io) {
+      return ApiResponse.error("Socket server not initialized", 500);
+    }
     // Broadcast clipboard:receive to the device room
     io.in(data.targetDeviceId).emit("clipboard:receive", data);
   } catch (err) {

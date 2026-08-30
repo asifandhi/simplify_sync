@@ -3,6 +3,7 @@
 import React, { useRef, useState } from 'react';
 import { useUserStore } from '@/store/userStore';
 import { Switch } from '@/components/ui/switch';
+import axios from 'axios';
 
 export default function SettingsPanel() {
   const { 
@@ -20,7 +21,10 @@ export default function SettingsPanel() {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setProfileImage(reader.result as string);
+        const base64 = reader.result as string;
+        setProfileImage(base64);
+        axios.post('/api/setting', { key: 'web_profile_image', value: base64 })
+          .catch(err => console.error("Failed to sync profile image to server", err));
       };
       reader.readAsDataURL(file);
     }

@@ -1,5 +1,7 @@
-import { insertChatMessage, getDeviceBySessionToken } from "@/db/sqlite";
+import { insertChatMessage, getDeviceBySessionToken, updateDeviceProfileImage } from "@/db/sqlite";
 import { Server as HTTPServer } from "http";
+import fs from "fs";
+import path from "path";
 
 import { Server, Socket } from "socket.io";
 
@@ -160,6 +162,48 @@ export function initSocket(server: HTTPServer) {
 
       console.log(`[Socket] Clipboard sync from ${socket.id} to ${payload.targetDeviceId}`);
       socket.to(payload.targetDeviceId).emit("clipboard:receive", payload);
+    });
+
+    socket.on("request_chat_sync", (data) => {
+      const actualDeviceId = socket.data.device_id;
+      if (!actualDeviceId || actualDeviceId !== data.device_id) return;
+      console.log(`[Socket] Chat sync requested by mobile: ${actualDeviceId}`);
+      socket.to(actualDeviceId).emit("chat_sync_ready", { device_id: actualDeviceId });
+    });
+
+    socket.on("sync_profile", (data: { device_id: string, base64_image: string }) => {
+      const actualDeviceId = socket.data.device_id;
+      if (!actualDeviceId || actualDeviceId !== data.device_id) return;
+      
+      try {
+        const matches = data.base64_image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        let base64Data = data.base64_image;
+        let ext = 'jpg';
+        
+        if (matches && matches.length === 3) {
+          ext = matches[1].split('/')[1] || 'jpg';
+          base64Data = matches[2];
+        }
+
+        const fileName = `android-${actualDeviceId}-${Date.now()}.${ext}`;
+        const dirPath = path.join(process.cwd(), "public", "uploads", "profiles");
+        
+        if (!fs.existsSync(dirPath)) {
+          fs.mkdirSync(dirPath, { recursive: true });
+        }
+        
+        const filePath = path.join(dirPath, fileName);
+        fs.writeFileSync(filePath, base64Data, 'base64');
+        
+        const fileUrl = `/uploads/profiles/${fileName}`;
+        updateDeviceProfileImage(actualDeviceId, fileUrl);
+        
+        console.log(`[Socket] Profile synced for ${actualDeviceId}: ${fileUrl}`);
+        // Notify web UI to refresh
+        socket.to(actualDeviceId).emit("profile_synced", { device_id: actualDeviceId, profile_image: fileUrl });
+      } catch (err) {
+        console.error("[Socket] Failed to save synced profile photo:", err);
+      }
     });
 
   });

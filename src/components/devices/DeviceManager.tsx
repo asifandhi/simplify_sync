@@ -6,7 +6,7 @@ import { useDeviceStore } from '@/store/deviceStore';
 import DeviceCard from './DeviceCard';
 
 interface Props {
-  onSelectDevice?: (deviceId: string, deviceName: string) => void;
+  onSelectDevice?: (deviceId: string, deviceName: string, profileImage?: string) => void;
   selectedDeviceId?: string | null;
   searchQuery?: string;
 }
@@ -60,7 +60,7 @@ export default function DeviceManager({ onSelectDevice, selectedDeviceId, search
           key={device.device_id}
           device={device}
           isActive={device.device_id === selectedDeviceId}
-          onClick={() => onSelectDevice && onSelectDevice(device.device_id, device.device_name)}
+          onClick={() => onSelectDevice && onSelectDevice(device.device_id, device.device_name, device.profile_image)}
         />
       ))}
     </div>

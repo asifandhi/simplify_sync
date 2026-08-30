@@ -72,6 +72,12 @@ export const useChatStore = create<ChatStore>()(
 
           socket.on('device_presence', (data: { online: boolean; is_chat_open?: boolean }) => {
             console.log(`[ChatStore] Received device_presence:`, data);
+            const wasOnline = get().isDeviceOnline;
+            if (data.online && !wasOnline) {
+              import('sonner').then(({ toast }) => {
+                toast.success("Device connected");
+              });
+            }
             set({ isDeviceOnline: data.online, isChatOpen: !!data.is_chat_open });
           });
 
@@ -81,6 +87,31 @@ export const useChatStore = create<ChatStore>()(
             if (message.device_id !== activeDeviceId) return;
             if (message.id && messages.some((m) => m.id === message.id)) return;
             set({ messages: [...messages, message] });
+          });
+
+          socket.on('profile_synced', (data: { device_id: string, profile_image: string }) => {
+            import('./deviceStore').then(({ useDeviceStore }) => {
+              const { devices, setDevices } = useDeviceStore.getState();
+              const newDevices = devices.map(d => 
+                d.device_id === data.device_id ? { ...d, profile_image: data.profile_image } : d
+              );
+              setDevices(newDevices);
+            });
+          });
+
+          socket.on('chat_sync_ready', async (data: { device_id: string }) => {
+            const { activeDeviceId } = get();
+            if (data.device_id === activeDeviceId) {
+              try {
+                const res = await fetch(`/api/chat?device_id=${activeDeviceId}&limit=50&offset=0`);
+                const json = await res.json();
+                if (json.success) {
+                  set({ messages: json.data.messages });
+                }
+              } catch (err) {
+                console.error("[ChatStore] Failed to sync chat", err);
+              }
+            }
           });
 
           set({ socket });
