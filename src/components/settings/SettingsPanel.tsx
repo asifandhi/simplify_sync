@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import { useUserStore } from '@/store/userStore';
 import { Switch } from '@/components/ui/switch';
 import axios from 'axios';
@@ -9,12 +9,10 @@ export default function SettingsPanel() {
   const { 
     profileImage, setProfileImage, 
     theme, setTheme, 
-    autoSyncClipboard, setAutoSyncClipboard,
     enableDoubleClickCopy,setEnableDoubleClickCopy 
   } = useUserStore();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [showSyncModal, setShowSyncModal] = useState(false);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -28,21 +26,6 @@ export default function SettingsPanel() {
       };
       reader.readAsDataURL(file);
     }
-  };
-
-
-
-  const handleToggleAutoSync = () => {
-    if (!autoSyncClipboard) {
-      setShowSyncModal(true);
-    } else {
-      setAutoSyncClipboard(false);
-    }
-  };
-
-  const confirmAutoSync = () => {
-    setAutoSyncClipboard(true);
-    setShowSyncModal(false);
   };
 
   return (
@@ -82,20 +65,7 @@ export default function SettingsPanel() {
         <section className="p-6 bg-[var(--color-surface-container)] rounded-2xl border border-[var(--color-outline-variant)]/30">
           <h3 className="text-[var(--text-headline-md)] text-[var(--color-primary)] font-headline-md mb-4">Preferences</h3>
           
-
           <div className="flex items-center justify-between py-4">
-            <div>
-              <p className="text-[var(--color-primary)] font-medium text-sm">Auto-Sync Clipboard</p>
-              <p className="text-[var(--color-on-surface-variant)] text-xs mt-1">Automatically send copied text to paired devices.</p>
-            </div>
-            <Switch
-              checked={autoSyncClipboard}
-              onCheckedChange={handleToggleAutoSync}
-              id="auto-sync-mode"
-            />
-          </div>
-
-          <div className="flex items-center justify-between py-4 border-t border-[var(--color-outline-variant)]/20 mt-2 pt-6">
             <div>
               <p className="text-[var(--color-primary)] font-medium text-sm">Double-Click to Copy</p>
               <p className="text-[var(--color-on-surface-variant)] text-xs mt-1">Double-click a message bubble in chat to instantly copy it.</p>
@@ -108,32 +78,6 @@ export default function SettingsPanel() {
           </div>
         </section>
       </div>
-
-      {/* Custom Auto-Sync Modal */}
-      {showSyncModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-background)]/80 backdrop-blur-sm">
-          <div className="bg-[var(--color-surface-container)] border border-[var(--color-outline-variant)]/50 p-8 rounded-3xl max-w-sm w-full shadow-2xl">
-            <h3 className="text-xl font-headline-lg text-[var(--color-primary)] mb-4">Enable Auto-Sync?</h3>
-            <p className="text-[var(--color-on-surface-variant)] text-sm mb-8 leading-relaxed">
-              This will automatically push any text you copy on this device directly to your paired mobile device using your local network.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button 
-                onClick={() => setShowSyncModal(false)}
-                className="px-4 py-2 text-sm font-medium text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={confirmAutoSync}
-                className="px-4 py-2 text-sm font-medium bg-[var(--color-primary)] text-[var(--color-on-primary)] rounded-lg hover:bg-[var(--color-surface-variant)] hover:text-[var(--color-primary)] transition-colors"
-              >
-                Enable
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

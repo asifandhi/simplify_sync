@@ -1,4 +1,4 @@
-import { getChatByDeviceId, insertChatMessage } from "@/db/sqlite";
+import { getChatByDeviceId, insertChatMessage, deleteMultipleChatMessages, deleteAllChatMessages } from "@/db/sqlite";
 import { ApiResponse } from "@/lib/utils/ApiResponse";
 import { asyncHandler } from "@/lib/utils/asyncHandler";
 import { NextResponse } from "next/server";
@@ -71,4 +71,36 @@ export const POST = asyncHandler(async (request: Request) => {
   }
 
   return ApiResponse.success(savedMessage);
+});
+
+export const DELETE = asyncHandler(async (request: Request) => {
+  const data = await request.json();
+  const authDeviceId = request.headers.get("x-device-id");
+  const device_id = authDeviceId || data.device_id;
+  
+  if (!device_id) return ApiResponse.error("device_id is required", 400);
+
+  // Prevent authenticated mobile clients from deleting other devices' chats
+  if (authDeviceId && data.device_id && authDeviceId !== data.device_id) {
+    return ApiResponse.error("Unauthorized: Cannot delete other device's chat", 403);
+  }
+
+  const { message_ids, sync_to_device } = data;
+
+  if (message_ids === "all") {
+    deleteAllChatMessages(device_id);
+  } else if (Array.isArray(message_ids) && message_ids.length > 0) {
+    deleteMultipleChatMessages(message_ids, device_id);
+  }
+
+  if (sync_to_device) {
+    try {
+      const io = getIO();
+      if (io) io.in(device_id).emit("delete_messages", { message_ids });
+    } catch (err) {
+      console.error("[API/Chat] Failed to broadcast delete_messages:", err);
+    }
+  }
+
+  return ApiResponse.success({ deleted: true });
 });

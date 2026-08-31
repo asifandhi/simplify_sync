@@ -38,6 +38,7 @@ interface ChatStore {
   sendMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
   flushQueue: () => void;
   retryMessage: (localId: string) => void;
+  deleteMessages: (messageIds: number[] | 'all', syncToDevice: boolean) => Promise<void>;
 }
 
 export const useChatStore = create<ChatStore>()(
@@ -111,6 +112,16 @@ export const useChatStore = create<ChatStore>()(
               } catch (err) {
                 console.error("[ChatStore] Failed to sync chat", err);
               }
+            }
+          });
+
+          socket.on('delete_messages', (data: { message_ids: number[] | 'all' }) => {
+            if (data.message_ids === 'all') {
+              set({ messages: [] });
+            } else if (Array.isArray(data.message_ids)) {
+              set(state => ({
+                messages: state.messages.filter(m => m.id === undefined || !data.message_ids.includes(m.id))
+              }));
             }
           });
 
@@ -226,6 +237,35 @@ export const useChatStore = create<ChatStore>()(
           ),
         }));
         get().flushQueue();
+      },
+
+      deleteMessages: async (messageIds: number[] | 'all', syncToDevice: boolean) => {
+        const { activeDeviceId } = get();
+        if (!activeDeviceId) return;
+        
+        try {
+          const res = await fetch('/api/chat', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              device_id: activeDeviceId,
+              message_ids: messageIds,
+              sync_to_device: syncToDevice
+            }),
+          });
+          const result = await res.json();
+          if (result.success) {
+            if (messageIds === 'all') {
+              set({ messages: [] });
+            } else if (Array.isArray(messageIds)) {
+              set(state => ({
+                messages: state.messages.filter(m => m.id === undefined || !messageIds.includes(m.id))
+              }));
+            }
+          }
+        } catch (err) {
+          console.error('[ChatStore] Failed to delete messages', err);
+        }
       },
     }),
     {

@@ -2,14 +2,12 @@ import { create } from 'zustand';
 import axios from 'axios';
 
 interface SettingsState {
-  clipboardSyncEnabled: boolean;
   folderMirrorEnabled: boolean; // Pre-emptively added for Phase 7
   fetchSettings: () => Promise<void>;
   updateSetting: (key: string, value: boolean) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
-  clipboardSyncEnabled: false,
   folderMirrorEnabled: false,
 
   fetchSettings: async () => {
@@ -17,11 +15,9 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       const res = await axios.get('/api/setting');
       if (res.data.success) {
           // SQLite stores booleans as 1/0 or strings depending on implementation, handle coercions
-        const ResponseClipboardState = res.data.data.clipboardSyncEnabled;
         const ResponseFolderMirrorState = res.data.data.folderMirrorEnabled;
         
         set({
-          clipboardSyncEnabled: ResponseClipboardState === 'true' || ResponseClipboardState === 1 || ResponseClipboardState === true,
           folderMirrorEnabled: ResponseFolderMirrorState === 'true' || ResponseFolderMirrorState === 1 || ResponseFolderMirrorState === true,
         });
       }

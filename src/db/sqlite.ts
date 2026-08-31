@@ -168,6 +168,22 @@ export function deleteMultipleChatMessages(ids: number[], device_id: string) {
   }
 }
 
+export function deleteAllChatMessages(device_id: string) {
+  try {
+    const stmt = db.prepare(
+      `DELETE FROM chat_history WHERE device_id = ?`,
+    );
+    const result = stmt.run(device_id);
+    if (process.env.NODE_ENV === "development") {
+      console.log(`Deleted all chat messages for device: ${device_id}`);
+    }
+    return result.changes > 0;
+  } catch (error) {
+    console.error("Error deleting all chat messages:", error);
+    return false;
+  }
+}
+
 
 export function getAllDevices() {
   const stmt = db.prepare('SELECT * FROM devices');

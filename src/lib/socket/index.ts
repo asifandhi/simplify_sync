@@ -1,4 +1,4 @@
-import { insertChatMessage, getDeviceBySessionToken, updateDeviceProfileImage } from "@/db/sqlite";
+import { insertChatMessage, getDeviceBySessionToken, updateDeviceProfileImage, deleteMultipleChatMessages, deleteAllChatMessages } from "@/db/sqlite";
 import { Server as HTTPServer } from "http";
 import fs from "fs";
 import path from "path";
@@ -146,24 +146,6 @@ export function initSocket(server: HTTPServer) {
       }
     });
 
-    socket.on("clipboard:sync", (payload) => {
-      // Only allow authenticated sockets to emit clipboard:sync
-      const actualDeviceId = socket.data.device_id;
-      if (!actualDeviceId) {
-        console.warn("[Socket] Clipboard sync rejected: unauthorized unauthenticated socket");
-        return;
-      }
-      
-      // Verify pairing: Mobile device can only sync to its own room
-      if (actualDeviceId !== payload.targetDeviceId) {
-        console.warn(`[Socket] Clipboard sync rejected: sender ${actualDeviceId} is not paired with target ${payload.targetDeviceId}`);
-        return;
-      }
-
-      console.log(`[Socket] Clipboard sync from ${socket.id} to ${payload.targetDeviceId}`);
-      socket.to(payload.targetDeviceId).emit("clipboard:receive", payload);
-    });
-
     socket.on("request_chat_sync", (data) => {
       const actualDeviceId = socket.data.device_id;
       if (!actualDeviceId || actualDeviceId !== data.device_id) return;
@@ -204,6 +186,21 @@ export function initSocket(server: HTTPServer) {
       } catch (err) {
         console.error("[Socket] Failed to save synced profile photo:", err);
       }
+    });
+    socket.on("delete_messages", (payload: { device_id: string, message_ids: number[] | 'all' }) => {
+      const actualDeviceId = socket.data.device_id;
+      if (!actualDeviceId || actualDeviceId !== payload.device_id) return;
+      
+      console.log(`[Socket] Delete messages requested by ${actualDeviceId}:`, payload.message_ids);
+      
+      if (payload.message_ids === 'all') {
+        deleteAllChatMessages(actualDeviceId);
+      } else if (Array.isArray(payload.message_ids)) {
+        deleteMultipleChatMessages(payload.message_ids, actualDeviceId);
+      }
+      
+      // Broadcast to the room (which includes Web UI clients) so they can update their state
+      socket.to(actualDeviceId).emit("delete_messages", payload);
     });
 
   });

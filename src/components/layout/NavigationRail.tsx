@@ -35,15 +35,7 @@ export default function NavigationRail() {
             home
           </span>
         </Link>
-        <Link
-          href="/?view=settings"
-          aria-label="Settings"
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-surface-container-low)] transition-all duration-200 group"
-        >
-          <span className="material-symbols-outlined group-hover:scale-110 transition-transform text-[20px]">
-            settings
-          </span>
-        </Link>
+        
       </div>
 
       {/* Bottom Actions */}
@@ -58,7 +50,8 @@ export default function NavigationRail() {
           </span>
         </button>
         
-        <button
+        <Link
+          href="/?view=settings"
           aria-label="User Profile"
           className="w-8 h-8 rounded-full overflow-hidden border border-[var(--color-outline-variant)] hover:border-[var(--color-outline)] transition-colors cursor-pointer ring-2 ring-transparent focus:ring-[var(--color-surface-variant)]"
         >
@@ -67,7 +60,7 @@ export default function NavigationRail() {
             src={profileImage}
             alt="Profile"
           />
-        </button>
+        </Link>
       </div>
     </nav>
   );

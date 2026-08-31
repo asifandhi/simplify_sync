@@ -5,13 +5,11 @@ import { asyncHandler } from "@/lib/utils/asyncHandler";
 
 export const GET = asyncHandler(async (request: Request) => {
   // getSetting returns a string or null directly, so no need for .value
-  const clipboardSync = getSetting("clipboardSyncEnabled");
   const folderMirror = getSetting("folderMirrorEnabled");
   const webProfileImage = getSetting("web_profile_image");
 
   const settingsData = {
     // Fallback to "false" if the setting hasn't been saved in DB yet
-    clipboardSyncEnabled: clipboardSync || "false",
     folderMirrorEnabled: folderMirror || "false",
     web_profile_image: webProfileImage || null,
   };

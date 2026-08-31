@@ -1,6 +1,7 @@
 import { useChatStore } from "@/store/chatStore";
 import { useUserStore } from "@/store/userStore";
 import axios from "axios";
+// import { useSocket } from "@/lib/socket/SocketProvider";
 import React, { useEffect, useRef, useState } from "react";
 
 
@@ -43,7 +44,7 @@ function dateMaker(date?: string | Date): string {
   });
 }
 function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
-  const enableDoubleClickCopy = useUserStore((s) => s.enableDoubleClickCopy);
+  const { enableDoubleClickCopy } = useUserStore();
 
   const isDeviceOnline = useChatStore((s) => s.isDeviceOnline);
 
@@ -62,6 +63,14 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
   const [copiedMessageId, setCopiedMessageId] = useState<
     string | number | null
   >(null);
+
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showMenu, setShowMenu] = useState(false);
+  const [showClearChatModal, setShowClearChatModal] = useState(false);
+  const [clearChatSync, setClearChatSync] = useState(false);
+
+  const { deleteMessages } = useChatStore();
 
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -98,6 +107,44 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const limit = 50;
+
+  const toggleSelection = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const cancelSelection = () => {
+    setIsSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const copySelected = () => {
+    const selectedMsgs = messages.filter((m) => m.id && selectedIds.has(m.id)).map(m => m.content).filter(Boolean);
+    if (selectedMsgs.length > 0) {
+      navigator.clipboard.writeText(selectedMsgs.join("\n\n"));
+      cancelSelection();
+    }
+  };
+
+  const deleteSelected = () => {
+    if (selectedIds.size > 0) {
+      // Sync is false for individual selects, as per instructions. Wait, user wants a dialog or what?
+      // "first option is select when presed i can select messages in proper way adn delete, and coply all option appers in header bar hide all of things"
+      // User didn't specify sync for select, only for clear chat. So I'll just delete them.
+      deleteMessages(Array.from(selectedIds), false);
+      cancelSelection();
+    }
+  };
+
+  const clearChat = () => {
+    deleteMessages('all', clearChatSync);
+    setShowClearChatModal(false);
+    setShowMenu(false);
+  };
 
   useEffect(() => {
     if (!deviceId) return;
@@ -374,44 +421,100 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
       )}
 
       {/* Header */}
-      <header className="h-15 px-[var(--spacing-margin-container)] flex items-center justify-between border-b border-[var(--color-outline-variant)]/30 bg-[var(--color-background)]/80 backdrop-blur-md z-10 shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="relative shrink-0 hidden md:block">
-            {profileImage ? (
-              <img src={profileImage} alt={deviceName} className="w-10 h-10 rounded-full object-cover border border-[var(--color-outline-variant)]" />
-            ) : (
-              <div className="w-10 h-10 rounded-full border border-[var(--color-outline-variant)] flex items-center justify-center font-headline-md text-[var(--color-on-surface)] bg-[var(--color-surface-variant)]">
-                {deviceName.charAt(0).toUpperCase()}
+      {isSelectionMode ? (
+        <header className="h-15 px-[var(--spacing-margin-container)] flex items-center justify-between border-b border-[var(--color-outline-variant)]/30 bg-[var(--color-surface-container)] z-10 shrink-0">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={cancelSelection}
+              className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--color-on-surface-variant)] hover:bg-black/10 transition-colors"
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+            <h2 className="font-headline-md text-[var(--text-headline-md)] text-[var(--color-on-surface)]">
+              {selectedIds.size} Selected
+            </h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={copySelected}
+              className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--color-on-surface-variant)] hover:bg-black/10 transition-colors"
+              title="Copy Selected"
+            >
+              <span className="material-symbols-outlined">content_copy</span>
+            </button>
+            <button
+              onClick={deleteSelected}
+              className="w-10 h-10 rounded-full flex items-center justify-center text-red-500 hover:bg-red-500/10 transition-colors"
+              title="Delete Selected"
+            >
+              <span className="material-symbols-outlined">delete</span>
+            </button>
+          </div>
+        </header>
+      ) : (
+        <header className="h-15 px-[var(--spacing-margin-container)] flex items-center justify-between border-b border-[var(--color-outline-variant)]/30 bg-[var(--color-background)]/80 backdrop-blur-md z-10 shrink-0">
+          <div className="flex items-center gap-4">
+            <div className="relative shrink-0 hidden md:block">
+              {profileImage ? (
+                <img src={profileImage} alt={deviceName} className="w-10 h-10 rounded-full object-cover border border-[var(--color-outline-variant)]" />
+              ) : (
+                <div className="w-10 h-10 rounded-full border border-[var(--color-outline-variant)] flex items-center justify-center font-headline-md text-[var(--color-on-surface)] bg-[var(--color-surface-variant)]">
+                  {deviceName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              {isDeviceOnline && (
+                <div
+                  className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[var(--color-background)] ${isChatOpen ? "bg-green-500" : "bg-blue-500"}`}
+                ></div>
+              )}
+            </div>
+            <div>
+              <h2 className="font-headline-md text-[var(--text-headline-md)] text-[var(--color-primary)] flex items-center gap-2">
+                {deviceName}
+              </h2>
+
+              <p className="font-label-sm text-[var(--color-on-surface-variant)] text-[10px] mt-0.5 font-mono opacity-60">
+                ID: {deviceId}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 relative">
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container)] transition-colors"
+              title="More options"
+            >
+              <span className="material-symbols-outlined text-[22px]">
+                more_vert
+              </span>
+            </button>
+            
+            {showMenu && (
+              <div className="absolute right-0 top-12 w-48 bg-[var(--color-surface-container-high)] border border-[var(--color-outline-variant)]/30 rounded-md shadow-lg overflow-hidden z-50">
+                <button
+                  className="w-full text-left px-4 py-3 text-sm text-[var(--color-on-surface)] hover:bg-[var(--color-surface-container-highest)]"
+                  onClick={() => {
+                    setIsSelectionMode(true);
+                    setShowMenu(false);
+                  }}
+                >
+                  Select Messages
+                </button>
+                <button
+                  className="w-full text-left px-4 py-3 text-sm text-red-500 hover:bg-[var(--color-surface-container-highest)]"
+                  onClick={() => {
+                    setShowClearChatModal(true);
+                    setShowMenu(false);
+                  }}
+                >
+                  Clear Chat
+                </button>
               </div>
             )}
-            {isDeviceOnline && (
-              <div
-                className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[var(--color-background)] ${isChatOpen ? "bg-green-500" : "bg-blue-500"}`}
-              ></div>
-            )}
           </div>
-          <div>
-            <h2 className="font-headline-md text-[var(--text-headline-md)] text-[var(--color-primary)] flex items-center gap-2">
-              {deviceName}
-            </h2>
-
-            <p className="font-label-sm text-[var(--color-on-surface-variant)] text-[10px] mt-0.5 font-mono opacity-60">
-              ID: {deviceId}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container)] transition-colors"
-            title="More options"
-          >
-            <span className="material-symbols-outlined text-[22px]">
-              more_vert
-            </span>
-          </button>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Messages Area */}
       <div
@@ -443,37 +546,49 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
 
               {/* Message Bubble */}
               <div
-                className={`flex flex-col max-w-[85%] md:max-w-[70%] gap-1 group relative ${isMe ? "self-end items-end" : "self-start"}`}
+                className={`flex flex-col max-w-[85%] md:max-w-[70%] gap-1 group relative ${isMe ? "self-end items-end" : "self-start"} ${isSelectionMode ? "cursor-pointer" : ""}`}
+                onClick={() => {
+                  if (isSelectionMode && msg.id) {
+                    toggleSelection(msg.id);
+                  }
+                }}
               >
                 <div
-                  className={`flex items-end gap-1.5 py-1 rounded-2xl font-body-md leading-relaxed cursor-pointer ${
-                    enableDoubleClickCopy ? "select-none" : ""
+                  className={`flex items-end gap-1.5 py-1 rounded-2xl font-body-md leading-relaxed ${
+                    !isSelectionMode && enableDoubleClickCopy ? "cursor-pointer select-none" : ""
                   } ${
                     isMe
                       ? "bg-[#1E9CF1] text-white rounded-tr-sm shadow-sm pl-3.5 pr-2"
                       : "bg-[var(--color-surface-container-high)] text-[var(--color-on-surface)] rounded-tl-sm border border-transparent pl-2.5 pr-3.5"
-                  }`}
+                  } ${msg.id && selectedIds.has(msg.id) ? "opacity-75 ring-2 ring-white/50" : ""}`}
                   onDoubleClick={() => {
-                    if (enableDoubleClickCopy && msg.content) {
+                    if (!isSelectionMode && enableDoubleClickCopy && msg.content) {
                       navigator.clipboard.writeText(msg.content);
                       const id = msg.id || `fallback-${idx}`;
                       setCopiedMessageId(id);
                       setTimeout(() => setCopiedMessageId(null), 1500);
                     }
                   }}
-                  title={enableDoubleClickCopy ? "Double-click to copy" : ""}
+                  title={!isSelectionMode && enableDoubleClickCopy ? "Double-click to copy" : ""}
                 >
                   {renderBubbleContent(msg, isMe)}
 
                   {msg.timestamp && (
                     <div
-                      className={`text-[9px] shrink-0 pb-0.5 select-none ${
+                      className={`text-[9px] shrink-0 pb-0.5 select-none flex items-center gap-1 ${
                         isMe
                           ? "text-white/80"
                           : "text-[var(--color-on-surface-variant)]"
                       }`}
                     >
-                      {formatMessageTime(msg.timestamp)}
+                      <span>{formatMessageTime(msg.timestamp)}</span>
+                      {isMe && (
+                        <img 
+                          src="/icons/sent.svg" 
+                          className="w-[11px] h-[11px] opacity-80 brightness-0 invert" 
+                          alt="Sent" 
+                        />
+                      )}
                     </div>
                   )}
                 </div>
@@ -511,28 +626,33 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
                 <span className="flex-1 wrap-break-word whitespace-pre-wrap text-sm">
                   {p.payload.content}
                 </span>
-                <span className="text-[10px] text-white/70 ml-auto">
-                  {new Date().toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-                {p.status === "failed" ? (
-                  <button
-                    onClick={() => retryMessage(p.localId)}
-                    title="Retry sending"
-                    className="flex items-center gap-1 text-[var(--color-error)] hover:opacity-80 transition-opacity shrink-0"
-                  >
-                    <span className="material-symbols-outlined text-[14px]">
-                      error
-                    </span>
-                    <span className="text-[10px] font-medium">Retry</span>
-                  </button>
-                ) : (
-                  <span className="material-symbols-outlined text-[14px] shrink-0 animate-pulse text-white/90">
-                    schedule
+                
+                <div className="flex items-center gap-1 ml-auto text-white/70">
+                  <span className="text-[10px]">
+                    {new Date().toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                   </span>
-                )}
+                  {p.status === "failed" ? (
+                    <button
+                      onClick={() => retryMessage(p.localId)}
+                      title="Retry sending"
+                      className="flex items-center gap-1 text-[var(--color-error)] hover:opacity-80 transition-opacity shrink-0 ml-1"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">
+                        error
+                      </span>
+                      <span className="text-[10px] font-medium">Retry</span>
+                    </button>
+                  ) : (
+                    <img 
+                      src="/icons/pending.svg" 
+                      className="w-3 h-3 shrink-0 animate-pulse opacity-90 brightness-0 invert" 
+                      alt="Pending" 
+                    />
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -632,6 +752,42 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
           </button>
         </form>
       </div>
+
+      {showClearChatModal && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-[var(--color-surface-container)] w-[90%] max-w-sm rounded-2xl p-6 shadow-2xl border border-[var(--color-outline-variant)]/30">
+            <h3 className="text-xl font-bold text-[var(--color-on-surface)] mb-2">Clear Chat</h3>
+            <p className="text-sm text-[var(--color-on-surface-variant)] mb-4">
+              Are you sure you want to clear all messages with this device? This action cannot be undone.
+            </p>
+            <label className="flex items-center gap-3 mb-6 cursor-pointer group">
+              <input 
+                type="checkbox" 
+                checked={clearChatSync}
+                onChange={(e) => setClearChatSync(e.target.checked)}
+                className="w-5 h-5 rounded border-[var(--color-outline)] text-[var(--color-primary)] focus:ring-0 focus:ring-offset-0 bg-[var(--color-surface-container-highest)] accent-[var(--color-primary)]"
+              />
+              <span className="text-sm text-[var(--color-on-surface)] group-hover:text-[var(--color-primary)] transition-colors">
+                Also delete from Android app
+              </span>
+            </label>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowClearChatModal(false)}
+                className="px-4 py-2 rounded-full text-sm font-medium text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-variant)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={clearChat}
+                className="px-4 py-2 rounded-full text-sm font-medium bg-red-500 hover:bg-red-600 text-white transition-colors shadow-md"
+              >
+                Clear Chat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
