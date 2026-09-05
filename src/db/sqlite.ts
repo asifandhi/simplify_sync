@@ -186,7 +186,7 @@ export function deleteAllChatMessages(device_id: string) {
 
 
 export function getAllDevices() {
-  const stmt = db.prepare('SELECT * FROM devices');
+  const stmt = db.prepare('SELECT * FROM devices ORDER BY last_active DESC');
   return stmt.all();
 }
 export function getDeviceBySessionToken(session_token: string) {
@@ -200,12 +200,23 @@ interface DeviceInput {
   device_name: string;
   session_token: string;
 }
-export function insertDevice(data:DeviceInput) {
+export function insertDevice(data: DeviceInput) {
+  const now = new Date().toISOString();
   const stmt = db.prepare(`
     INSERT INTO devices (device_id, device_name, session_token, trust_level, last_active, is_trusted)
-    VALUES (@device_id, @device_name, @session_token, 1, CURRENT_TIMESTAMP, 0)
+    VALUES (?, ?, ?, 1, ?, 0)
   `);
-  return stmt.run(data);
+  return stmt.run(data.device_id, data.device_name, data.session_token, now);
+}
+
+export function updateDeviceLastActive(device_id: string, timestamp?: string) {
+  const ts = timestamp || new Date().toISOString();
+  try {
+    const stmt = db.prepare(`UPDATE devices SET last_active = ? WHERE device_id = ?`);
+    return stmt.run(ts, device_id);
+  } catch (err) {
+    console.error("[DB] Failed to update device last_active:", err);
+  }
 }
 
 export function updateDeviceProfileImage(device_id: string, profile_image: string) {

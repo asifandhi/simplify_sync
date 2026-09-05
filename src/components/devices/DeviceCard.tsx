@@ -9,6 +9,7 @@ interface Props {
     device_name: string;
     last_active: string;
     profile_image?: string;
+    is_online?: boolean;
   };
   isActive?: boolean;
   onClick?: () => void;
@@ -33,9 +34,21 @@ function avatarColor(name: string): string {
   return palette[name.charCodeAt(0) % palette.length];
 }
 
+/** Accurately parses SQLite or ISO timestamp in UTC */
+function parseTimestamp(raw: string | null | undefined): number {
+  if (!raw) return Date.now();
+  if (raw.includes("T") && (raw.endsWith("Z") || /[+-]\d{2}:\d{2}$/.test(raw))) {
+    return new Date(raw).getTime();
+  }
+  const utcStr = raw.includes("T") ? raw + "Z" : raw.replace(" ", "T") + "Z";
+  const parsed = new Date(utcStr).getTime();
+  return isNaN(parsed) ? new Date(raw).getTime() : parsed;
+}
+
 /** Relative time helper */
 function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
+  const diff = Date.now() - parseTimestamp(iso);
+  if (diff < 0) return "just now";
   const m = Math.floor(diff / 60000);
   if (m < 1) return "just now";
   if (m < 60) return `${m}m`;
@@ -48,6 +61,13 @@ export default function DeviceCard({ device, isActive, onClick }: Props) {
   const removeDevice = useDeviceStore((state) => state.removeDevice);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Periodic re-render every 30s so relative timestamps ("just now", "1m") update naturally
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleRevoke = async () => {
     setContextMenu(null);
@@ -96,15 +116,20 @@ export default function DeviceCard({ device, isActive, onClick }: Props) {
         }`}
       >
         {/* Avatar */}
-        {device.profile_image ? (
-          <img src={device.profile_image} alt={device.device_name} className="w-12 h-12 rounded-full flex-shrink-0 object-cover" />
-        ) : (
-          <div
-            className={`w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-[18px] ${avatarColor(device.device_name)}`}
-          >
-            {device.device_name.charAt(0).toUpperCase()}
-          </div>
-        )}
+        <div className="relative flex-shrink-0">
+          {device.profile_image ? (
+            <img src={device.profile_image} alt={device.device_name} className="w-12 h-12 rounded-full object-cover" />
+          ) : (
+            <div
+              className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-[18px] ${avatarColor(device.device_name)}`}
+            >
+              {device.device_name.charAt(0).toUpperCase()}
+            </div>
+          )}
+          {device.is_online && (
+            <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[var(--color-surface,white)]" />
+          )}
+        </div>
 
         {/* Text */}
         <div className="flex-1 min-w-0">
@@ -114,13 +139,25 @@ export default function DeviceCard({ device, isActive, onClick }: Props) {
             >
               {device.device_name}
             </span>
-            <span className="text-[11px] text-[var(--color-on-surface-variant)] shrink-0">
-              {relativeTime(device.last_active)}
-            </span>
+            {device.is_online ? (
+              <span className="text-[11px] font-medium text-emerald-500 shrink-0">
+                Online
+              </span>
+            ) : (
+              <span className="text-[11px] text-[var(--color-on-surface-variant)] shrink-0">
+                {relativeTime(device.last_active)}
+              </span>
+            )}
           </div>
-          <p className="text-[13px] text-[var(--color-on-surface-variant)] truncate mt-0.5">
-            Last active {relativeTime(device.last_active)} ago
-          </p>
+          {device.is_online ? (
+            <p className="text-[13px] text-emerald-500 font-medium truncate mt-0.5">
+              Online
+            </p>
+          ) : (
+            <p className="text-[13px] text-[var(--color-on-surface-variant)] truncate mt-0.5">
+              Last active {relativeTime(device.last_active)} ago
+            </p>
+          )}
         </div>
       </div>
 

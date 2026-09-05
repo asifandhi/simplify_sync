@@ -1,8 +1,6 @@
 import { getChatByDeviceId, insertChatMessage, deleteMultipleChatMessages, deleteAllChatMessages } from "@/db/sqlite";
 import { ApiResponse } from "@/lib/utils/ApiResponse";
 import { asyncHandler } from "@/lib/utils/asyncHandler";
-import { NextResponse } from "next/server";
-import { getIO } from "@/lib/socket";
 import { fetchOpenGraph } from "@/lib/utils/openGraph";
 
 export const GET = asyncHandler(async (request: Request) => {
@@ -63,12 +61,8 @@ export const POST = asyncHandler(async (request: Request) => {
     is_view_once: data.is_view_once,
   });
 
-  try {
-    const io = getIO();
-    if (io) io.in(device_id).emit("receive_message", savedMessage);
-  } catch (err) {
-    console.error("[API/Chat] Failed to broadcast message:", err);
-  }
+  // ponytail: broadcast removed — messages are now sent exclusively through socket
+  // send_message handler which does persist + broadcast (single emit path)
 
   return ApiResponse.success(savedMessage);
 });
@@ -85,7 +79,7 @@ export const DELETE = asyncHandler(async (request: Request) => {
     return ApiResponse.error("Unauthorized: Cannot delete other device's chat", 403);
   }
 
-  const { message_ids, sync_to_device } = data;
+  const { message_ids } = data;
 
   if (message_ids === "all") {
     deleteAllChatMessages(device_id);
@@ -93,14 +87,8 @@ export const DELETE = asyncHandler(async (request: Request) => {
     deleteMultipleChatMessages(message_ids, device_id);
   }
 
-  if (sync_to_device) {
-    try {
-      const io = getIO();
-      if (io) io.in(device_id).emit("delete_messages", { message_ids });
-    } catch (err) {
-      console.error("[API/Chat] Failed to broadcast delete_messages:", err);
-    }
-  }
+  // ponytail: broadcast removed — deletes are now handled exclusively through
+  // socket delete_messages handler which does DB + broadcast (single emit path)
 
   return ApiResponse.success({ deleted: true });
 });
