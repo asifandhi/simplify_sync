@@ -26,6 +26,11 @@ export const POST = asyncHandler(async (request: Request) => {
     throw new ApiError(400, "Missing 'key' or 'value' in request body");
   }
 
+  const allowedKeys = ['clipboardSyncEnabled', 'folderMirrorEnabled', 'web_profile_image'];
+  if (!allowedKeys.includes(key)) {
+    throw new ApiError(400, "Invalid key");
+  }
+
   // Persist to database
   setSetting(key, value.toString());
 

@@ -20,13 +20,13 @@ export function isDeviceOnline(deviceId: string): boolean {
 export function initSocket(server: HTTPServer) {
   // Idempotency guard — prevents double-init on hot-reload or accidental re-call
   if (io) {
-    console.warn("[Socket.io] initSocket called again — reusing existing instance.");
+    if (process.env.NODE_ENV === "development") console.warn("[Socket.io] initSocket called again — reusing existing instance.");
     return io;
   }
 
   io = new Server(server, {
     cors: {
-      origin: "*",
+      origin: process.env.SOCKET_CORS_ORIGIN || "http://localhost:3000",
       methods: ["GET", "POST"],
     },
   });
@@ -50,7 +50,7 @@ export function initSocket(server: HTTPServer) {
                            !origin;
 
       if (!isSameOrigin) {
-        console.warn(`[Socket.io] Rejected unauthenticated connection from origin: ${origin}`);
+        if (process.env.NODE_ENV === "development") console.warn(`[Socket.io] Rejected unauthenticated connection from origin: ${origin}`);
         return next(new Error("Unauthorized: no session token and non-local origin"));
       }
 
@@ -73,7 +73,7 @@ export function initSocket(server: HTTPServer) {
   });
 
   io.on("connection", (socket: Socket) => {
-    console.log(`[Socket.io] Client connected: ${socket.id} (role: ${socket.data.role})`);
+    if (process.env.NODE_ENV === "development") console.log(`[Socket.io] Client connected: ${socket.id} (role: ${socket.data.role})`);
     
     // Mobile clients authenticate via middleware and have socket.data.device_id
     if (socket.data.device_id) {
@@ -87,10 +87,10 @@ export function initSocket(server: HTTPServer) {
       activeMobileSockets.set(devId, count + 1);
       if (count === 0) {
         const isChatOpen = deviceChatState.get(devId) || false;
-        console.log(`[Presence] Broadcasting online:true for device ${devId}`);
+        if (process.env.NODE_ENV === "development") console.log(`[Presence] Broadcasting online:true for device ${devId}`);
         io.emit(SocketEvents.DEVICE_PRESENCE, { device_id: devId, online: true, is_chat_open: isChatOpen, last_active: now });
       }
-      console.log(`[Socket.io] ${socket.id} auto-joined room: ${devId} | Active connections: ${count + 1}`);
+      if (process.env.NODE_ENV === "development") console.log(`[Socket.io] ${socket.id} auto-joined room: ${devId} | Active connections: ${count + 1}`);
     }
     
     socket.on(SocketEvents.CHAT_STATE, (data: { is_open: boolean }) => {
@@ -99,14 +99,14 @@ export function initSocket(server: HTTPServer) {
         const now = new Date().toISOString();
         updateDeviceLastActive(devId, now);
         deviceChatState.set(devId, data.is_open);
-        console.log(`[Presence] Device ${devId} chat is_open:${data.is_open}`);
+        if (process.env.NODE_ENV === "development") console.log(`[Presence] Device ${devId} chat is_open:${data.is_open}`);
         io.emit(SocketEvents.DEVICE_PRESENCE, { device_id: devId, online: true, is_chat_open: data.is_open, last_active: now });
       }
     });
 
     socket.on(SocketEvents.REGISTER, (device_id: string) => {
       if (socket.data.role === 'mobile') {
-        console.log(`[Socket.io] Ignoring REGISTER from mobile client ${socket.id} (already bound to ${socket.data.device_id})`);
+        if (process.env.NODE_ENV === "development") console.log(`[Socket.io] Ignoring REGISTER from mobile client ${socket.id} (already bound to ${socket.data.device_id})`);
         return;
       }
 
@@ -119,12 +119,12 @@ export function initSocket(server: HTTPServer) {
       // Web UI clients use this to subscribe to a specific device's events
       socket.join(device_id);
       const rooms = Array.from(socket.rooms);
-      console.log(`[Socket.io] ${socket.id} registered for device: ${device_id} | All rooms: ${JSON.stringify(rooms)}`);
+      if (process.env.NODE_ENV === "development") console.log(`[Socket.io] ${socket.id} registered for device: ${device_id} | All rooms: ${JSON.stringify(rooms)}`);
       
       // Instantly reply with current presence status
       const isOnline = (activeMobileSockets.get(device_id) || 0) > 0;
       const isChatOpen = deviceChatState.get(device_id) || false;
-      console.log(`[Presence] Register request for ${device_id}. Responding with online:${isOnline}, is_chat_open:${isChatOpen}`);
+      if (process.env.NODE_ENV === "development") console.log(`[Presence] Register request for ${device_id}. Responding with online:${isOnline}, is_chat_open:${isChatOpen}`);
       socket.emit(SocketEvents.DEVICE_PRESENCE, { device_id, online: isOnline, is_chat_open: isChatOpen });
     });
 
@@ -136,14 +136,14 @@ export function initSocket(server: HTTPServer) {
       const actualDeviceId = socket.data.device_id || data.device_id;
 
       if (!actualDeviceId) {
-        console.error("[Socket.io] Rejecting send_message: no device_id");
+        if (process.env.NODE_ENV === "development") console.error("[Socket.io] Rejecting send_message: no device_id");
         if (typeof callback === "function") callback({ error: "No device_id" });
         return;
       }
 
       // For web clients, verify they're actually in the device's room
       if (!socket.data.device_id && !socket.rooms.has(actualDeviceId)) {
-        console.error(`[Socket.io] Rejecting send_message: web socket not in room '${actualDeviceId}'`);
+        if (process.env.NODE_ENV === "development") console.error(`[Socket.io] Rejecting send_message: web socket not in room '${actualDeviceId}'`);
         if (typeof callback === "function") callback({ error: "Not registered for this device" });
         return;
       }
@@ -169,7 +169,7 @@ export function initSocket(server: HTTPServer) {
           if (ogPreview) finalPreviewData = ogPreview;
         } catch (err) {
           // Non-fatal — message still sends without preview
-          console.warn("[Socket.io] OG preview fetch failed:", err);
+          if (process.env.NODE_ENV === "development") console.warn("[Socket.io] OG preview fetch failed:", err);
         }
       }
 
@@ -193,7 +193,7 @@ export function initSocket(server: HTTPServer) {
     });
 
     socket.on("disconnect", () => {
-      console.log(`[Socket.io] Client disconnected: ${socket.id}`);
+      if (process.env.NODE_ENV === "development") console.log(`[Socket.io] Client disconnected: ${socket.id}`);
       
       if (socket.data.device_id) {
         const devId = socket.data.device_id;
@@ -204,9 +204,9 @@ export function initSocket(server: HTTPServer) {
         if (count <= 1) {
           activeMobileSockets.delete(devId);
           deviceChatState.set(devId, false); // Reset chat state on disconnect
-          console.log(`[Presence] Broadcasting online:false for device ${devId}`);
+          if (process.env.NODE_ENV === "development") console.log(`[Presence] Broadcasting online:false for device ${devId}`);
           io.emit(SocketEvents.DEVICE_PRESENCE, { device_id: devId, online: false, is_chat_open: false, last_active: now });
-          console.log(`[Socket.io] Device ${devId} is now offline.`);
+          if (process.env.NODE_ENV === "development") console.log(`[Socket.io] Device ${devId} is now offline.`);
         } else {
           activeMobileSockets.set(devId, count - 1);
         }
@@ -216,7 +216,7 @@ export function initSocket(server: HTTPServer) {
     socket.on(SocketEvents.REQUEST_CHAT_SYNC, (data) => {
       const actualDeviceId = socket.data.device_id;
       if (!actualDeviceId || actualDeviceId !== data.device_id) return;
-      console.log(`[Socket] Chat sync requested by mobile: ${actualDeviceId}`);
+      if (process.env.NODE_ENV === "development") console.log(`[Socket] Chat sync requested by mobile: ${actualDeviceId}`);
       socket.to(actualDeviceId).emit(SocketEvents.CHAT_SYNC_READY, { device_id: actualDeviceId });
     });
 
@@ -247,11 +247,11 @@ export function initSocket(server: HTTPServer) {
         const fileUrl = `/uploads/profiles/${fileName}`;
         updateDeviceProfileImage(actualDeviceId, fileUrl);
         
-        console.log(`[Socket] Profile synced for ${actualDeviceId}: ${fileUrl}`);
+        if (process.env.NODE_ENV === "development") console.log(`[Socket] Profile synced for ${actualDeviceId}: ${fileUrl}`);
         // Notify web UI to refresh
         socket.to(actualDeviceId).emit(SocketEvents.PROFILE_SYNCED, { device_id: actualDeviceId, profile_image: fileUrl });
       } catch (err) {
-        console.error("[Socket] Failed to save synced profile photo:", err);
+        if (process.env.NODE_ENV === "development") console.error("[Socket] Failed to save synced profile photo:", err);
       }
     });
 
@@ -266,7 +266,7 @@ export function initSocket(server: HTTPServer) {
       // For web: verify socket is in the device's room
       if (!socket.data.device_id && !socket.rooms.has(actualDeviceId)) return;
       
-      console.log(`[Socket] Delete messages requested by ${socket.data.role} for ${actualDeviceId}:`, payload.message_ids);
+      if (process.env.NODE_ENV === "development") console.log(`[Socket] Delete messages requested by ${socket.data.role} for ${actualDeviceId}:`, payload.message_ids);
       
       if (payload.message_ids === 'all') {
         deleteAllChatMessages(actualDeviceId);
@@ -282,7 +282,7 @@ export function initSocket(server: HTTPServer) {
     });
 
   });
-  console.log("> Socket.io server initialized");
+  if (process.env.NODE_ENV === "development") console.log("> Socket.io server initialized");
 
   return io;
 }

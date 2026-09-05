@@ -1,8 +1,8 @@
-﻿import { ApiError } from "@/lib/utils/ApiError";
+import { ApiError } from "@/lib/utils/ApiError";
 import { ApiResponse } from "@/lib/utils/ApiResponse";
 import { asyncHandler } from "@/lib/utils/asyncHandler";
 import { randomUUID } from "crypto";
-import { mkdir } from "fs/promises";
+import { mkdir, unlink } from "fs/promises";
 import { createWriteStream } from "fs";
 import { NextRequest } from "next/server";
 import { join } from "path";
@@ -29,7 +29,8 @@ export const POST = asyncHandler(async (request: NextRequest) => {
     throw new ApiError(413, "File size exceeds the 100MB limit.");
   }
 
-  const uniqueName = `${randomUUID()}-${fileObject.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+  const sanitizedName = fileObject.name.replace(/[^a-zA-Z0-9.-]/g, "_").slice(0, 100);
+  const uniqueName = `${randomUUID()}-${sanitizedName}`;
   const uploadsDir = join(process.cwd(), "uploads");
   
   // 2. Ensure the uploads directory exists
@@ -41,14 +42,35 @@ export const POST = asyncHandler(async (request: NextRequest) => {
   const writeStream = createWriteStream(path);
   const reader = fileObject.stream().getReader();
   
+  let streamError: any = null;
+  writeStream.on("error", (err) => {
+    streamError = err;
+  });
+
   try {
     while (true) {
+      if (streamError) throw streamError;
       const { done, value } = await reader.read();
       if (done) break;
-      writeStream.write(value);
+      const canContinue = writeStream.write(value);
+      if (!canContinue) {
+        await new Promise<void>((resolve, reject) => {
+          writeStream.once("drain", resolve);
+          writeStream.once("error", reject);
+        });
+      }
     }
-  } finally {
-    writeStream.end();
+    await new Promise<void>((resolve, reject) => {
+      writeStream.once("finish", resolve);
+      writeStream.once("error", reject);
+      writeStream.end();
+    });
+  } catch (err: any) {
+    writeStream.destroy();
+    try {
+      await unlink(path);
+    } catch (_) {}
+    throw new ApiError(500, `File write failed: ${err?.message || err}`);
   }
 
   return ApiResponse.success(

@@ -5,6 +5,10 @@ import { createServer } from "http";
 import next from "next";
 import { parse } from "url";
 
+process.on('unhandledRejection', (err) => {
+  console.error('[UNHANDLED REJECTION]', err);
+});
+
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
 const port = parseInt(process.env.PORT || "3000", 10);
@@ -38,8 +42,8 @@ app.prepare().then(() => {
   // request arrives and any API route calls getIO().
   initSocket(server);
 
-  server.listen(port, (err?: any) => {
+  server.listen(port, "0.0.0.0", (err?: any) => {
     if (err) throw err;
-    console.log(`> Ready on http://${hostname}:${port}`);
+    console.log(`> Ready on http://0.0.0.0:${port}`);
   });
 });

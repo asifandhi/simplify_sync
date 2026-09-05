@@ -29,3 +29,13 @@
 - Implemented UDP broadcast for automatic local network discovery (`src/lib/discovery/udp.ts`).
 - Created dynamic Chat UI with TipTap formatting, drag-and-drop file support, and clipboard synchronization hooks.
 - Configured dynamic API routes for device pairing, message retrieval, and file uploads.  
+- Fixed auth bypass in middleware.ts by validating request IP is local.
+- Fixed 0.0.0.0 binding in server.ts to use localhost.
+- Fixed wildcard CORS in socket/index.ts to process.env.SOCKET_CORS_ORIGIN || http://localhost:3000.
+- Added key whitelist to setSetting in setting/route.ts.
+- Gated debug logs in socket/index.ts behind process.env.NODE_ENV === development.
+- Added backpressure drain-await and error event cleanup in upload/route.ts and transfer/route.ts.
+- Replaced full-buffer readFile with createReadStream streaming in file/route.ts.
+- Added 100-character cap on sanitized filenames in upload/route.ts and transfer/route.ts to prevent ENAMETOOLONG.
+- Added global process.on('unhandledRejection') handler in server.ts to prevent process crashes.
+- Restored 0.0.0.0 binding in server.ts so mobile devices on the LAN can reach the PC host.

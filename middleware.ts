@@ -12,8 +12,14 @@ export async function middleware(request: NextRequest) {
     const sessionToken = request.headers.get('x-session-token');
 
     if (!sessionToken) {
-      // Web UI connects without a session token (same origin assumption).
-      // We let it pass through without an x-device-id header.
+      // Verify the request IP is strictly 127.0.0.1/::1 before allowing tokenless access.
+      const ip = request.headers.get('x-forwarded-for');
+      if (ip !== '127.0.0.1' && ip !== '::1') {
+        return NextResponse.json(
+          { success: false, error: 'Unauthorized: Session token required' },
+          { status: 401 }
+        );
+      }
       return NextResponse.next();
     }
 
