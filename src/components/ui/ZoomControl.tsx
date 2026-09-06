@@ -42,16 +42,6 @@ export default function ZoomControl() {
       >
         +
       </button>
-
-      {zoomLevel !== 100 && (
-        <button
-          onClick={resetZoom}
-          title="Reset zoom to 100%"
-          className="pr-2 pl-0.5 text-[10px] text-[var(--color-primary)] hover:underline cursor-pointer"
-        >
-          Reset
-        </button>
-      )}
     </div>
   );
 }

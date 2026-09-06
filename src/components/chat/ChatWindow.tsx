@@ -719,8 +719,8 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
 
       {/* Messages Area */}
       <div
-        className="flex-1 overflow-y-auto p-[var(--spacing-margin-container)] flex flex-col gap-2 z-0 pb-16 custom-scrollbar relative bg-[url('/chat-bg-dark.png')] [.light_&]:bg-[url('/chat-bg.png')]"
-        style={{ backgroundSize: "400px", backgroundRepeat: "repeat" }}
+        className="flex-1 overflow-y-auto p-[var(--spacing-margin-container)] flex flex-col gap-2 z-0 pb-16 custom-scrollbar relative bg-[#000000] bg-[url('/chat-doodle-dark.svg')] [.light_&]:bg-[#ffffff] [.light_&]:bg-[url('/chat-doodle-light.svg')]"
+        style={{ backgroundSize: "260px 260px", backgroundRepeat: "repeat" }}
         ref={scrollRef}
         onScroll={handleScroll}
       >

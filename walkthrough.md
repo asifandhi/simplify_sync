@@ -55,4 +55,11 @@
   - Overlayed both the small SVG download button (`absolute bottom-2 left-2`) and the message timestamp badge (`absolute bottom-2 right-2`) directly onto the image with translucent dark pills (`bg-black/50 backdrop-blur-xs`), creating a clean, completely self-contained photo card with no extra bottom bar while leaving text and file bubbles untouched.
   - Enabled native drag-and-drop for chat images to external applications, desktop, and file explorer using Chromium's `DownloadURL` protocol and `text/uri-list`, with `cursor-grab active:cursor-grabbing` cursor feedback, while guarding internal chat dragover events with `isDraggingInternalRef`.
   - Constrained image bubble dimensions to compact chat-native proportions (`max-w-[260px] sm:max-w-[300px]`, `max-h-48 sm:max-h-52`) to eliminate oversized image display on desktop.
-  - Preserved existing `flex items-end py-1 pl-3.5 pr-2` padding for text, file, and link preview bubbles with zero visual regressions.
+  - **WhatsApp Doodle Chat Wallpaper Integration (`BG.html`)**:
+  - Extracted the vector doodle tile generator and all 25 vector symbols (`ic0` to `ic24`) from [`public/chatbg/BG.html`](file:///d:/An%20Engineer/Full%20stack/Projects/Asif-Sync/Main/Web%20App/simplify_sync/public/chatbg/BG.html) using deterministic seed `20260906`.
+  - Generated static, seamless SVG pattern tiles in [`public/chat-doodle-light.svg`](file:///d:/An%20Engineer/Full%20stack/Projects/Asif-Sync/Main/Web%20App/simplify_sync/public/chat-doodle-light.svg) (black doodles with opacity variance) and [`public/chat-doodle-dark.svg`](file:///d:/An%20Engineer/Full%20stack/Projects/Asif-Sync/Main/Web%20App/simplify_sync/public/chat-doodle-dark.svg) (white doodles with opacity variance) to avoid runtime DOM/canvas computation.
+  - Replaced legacy heavy raster PNGs with the new vector wallpaper in [`src/components/chat/ChatWindow.tsx`](file:///d:/An%20Engineer/Full%20stack/Projects/Asif-Sync/Main/Web%20App/simplify_sync/src/components/chat/ChatWindow.tsx):
+    - Dark mode: `bg-[#0b141a] bg-[url('/chat-doodle-dark.svg')]`
+    - Light mode: `[.light_&]:bg-[#efeae2] [.light_&]:bg-[url('/chat-doodle-light.svg')]`
+    - Sizing: `backgroundSize: "260px 260px"`, `backgroundRepeat: "repeat"` matching `--pattern-size: 260px` in `BG.html`.
+  - Maintained complete determinism with zero shuffle controls or runtime reshuffling per user request.
