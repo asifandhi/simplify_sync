@@ -148,6 +148,7 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
 
   useEffect(() => {
     if (!deviceId) return;
+    setMessages([]);
     setOffset(0);
     setHasMore(true);
     axios

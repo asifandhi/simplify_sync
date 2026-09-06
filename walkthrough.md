@@ -39,3 +39,8 @@
 - Added 100-character cap on sanitized filenames in upload/route.ts and transfer/route.ts to prevent ENAMETOOLONG.
 - Added global process.on('unhandledRejection') handler in server.ts to prevent process crashes.
 - Restored 0.0.0.0 binding in server.ts so mobile devices on the LAN can reach the PC host.
+- Fetched and merged/deduped missed messages on socket connect in chatStore.ts.
+- Extracted 6KB base64 default profile image from userStore.ts to static /public/default-profile.jpg and updated store to reference URL.
+- Added instant message clearing on deviceId change in ChatWindow.tsx to eliminate old message flash between conversation switches.
+- Added global persistent connection status indicator to NavigationRail.tsx visible on all views.
+- Implemented UDP discovery Socket.io emission in udp.ts and wired live toast notification in chatStore.ts on incoming pings.

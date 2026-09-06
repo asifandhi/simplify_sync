@@ -1,4 +1,5 @@
 import dgram from "dgram";
+import { getIO } from "@/lib/socket";
 
 let udpServer: dgram.Socket | null = null;
 
@@ -20,7 +21,12 @@ export function initUDP() {
       console.log(
         `> UDP Discovery ping received from ${rinfo.address}:${rinfo.port}`,
       );
-      // In Phase 3, we will emit a Socket.io event here to notify the PC dashboard
+      try {
+        const io = getIO();
+        io?.emit("device_discovered", { ip: rinfo.address, port: rinfo.port });
+      } catch (err) {
+        console.error("> Error emitting device_discovered:", err);
+      }
     }
   });
   server.on("listening", () => {

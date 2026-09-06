@@ -3,9 +3,11 @@
 import React from "react";
 import Link from "next/link";
 import { useUserStore } from "@/store/userStore";
+import { useChatStore } from "@/store/chatStore";
 
 export default function NavigationRail() {
   const { profileImage, theme, setTheme } = useUserStore();
+  const isConnected = useChatStore((s) => s.isConnected);
 
   const toggleTheme = () => {
     const newTheme = theme === "dark" ? "light" : "dark";
@@ -36,6 +38,17 @@ export default function NavigationRail() {
           </span>
         </Link>
         
+        {/* Global persistent connection dot indicator */}
+        <div
+          className="flex items-center justify-center py-1 cursor-help"
+          title={isConnected ? "Server Connected" : "Server Disconnected — Reconnecting..."}
+        >
+          <span
+            className={`w-2 h-2 rounded-full transition-colors duration-500 ${
+              isConnected ? "bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]" : "bg-amber-400 animate-pulse"
+            }`}
+          />
+        </div>
       </div>
 
       {/* Bottom Actions */}

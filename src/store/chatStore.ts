@@ -57,11 +57,33 @@ export const useChatStore = create<ChatStore>()(
         if (!socket) {
           socket = io();
 
-          socket.on('connect', () => {
+          socket.on('connect', async () => {
             set({ isConnected: true });
             const currentActive = get().activeDeviceId;
             if (currentActive) {
               socket?.emit('register', currentActive);
+              // Fetch missed inbound messages while disconnected/asleep
+              try {
+                const res = await fetch(`/api/chat?device_id=${currentActive}&limit=50&offset=0`);
+                const json = await res.json();
+                if (json.success && Array.isArray(json.data?.messages)) {
+                  const fetchedMsgs: ChatMessage[] = json.data.messages;
+                  set((state) => {
+                    if (state.activeDeviceId !== currentActive) return state;
+                    const existingIds = new Set(state.messages.map((m) => m.id).filter(Boolean));
+                    const newMessages = fetchedMsgs.filter((m) => !existingIds.has(m.id));
+                    if (newMessages.length === 0) return state;
+                    const merged = [...state.messages, ...newMessages].sort((a, b) => {
+                      const timeA = a.timestamp ? new Date(a.timestamp).getTime() : (a.id || 0);
+                      const timeB = b.timestamp ? new Date(b.timestamp).getTime() : (b.id || 0);
+                      return timeA - timeB;
+                    });
+                    return { messages: merged };
+                  });
+                }
+              } catch (err) {
+                console.error('[ChatStore] Failed to fetch missed messages on reconnect:', err);
+              }
             }
             // Flush any queued messages on reconnect
             get().flushQueue();
@@ -91,6 +113,13 @@ export const useChatStore = create<ChatStore>()(
               }
               set({ isDeviceOnline: data.online, isChatOpen: !!data.is_chat_open });
             }
+          });
+
+          socket.on('device_discovered', (data: { ip: string; port: number }) => {
+            console.log(`[ChatStore] Discovered device at ${data.ip}:${data.port}`);
+            import('sonner').then(({ toast }) => {
+              toast.info(`Device discovered at ${data.ip}:${data.port}`);
+            });
           });
 
           socket.on('receive_message', (message: ChatMessage) => {
