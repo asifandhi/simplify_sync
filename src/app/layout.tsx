@@ -34,6 +34,9 @@ export default function RootLayout({
                   if (parsed.state && parsed.state.theme === 'light') {
                     theme = 'light';
                   }
+                  if (parsed.state && typeof parsed.state.zoomLevel === 'number') {
+                    document.documentElement.style.setProperty('--app-zoom', (parsed.state.zoomLevel / 100).toString());
+                  }
                 }
                 document.documentElement.classList.add(theme);
               } catch (e) {}

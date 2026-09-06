@@ -4,9 +4,11 @@ import React, { useState, Suspense, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import DeviceManager from "@/components/devices/DeviceManager";
 import ChatWindow from "@/components/chat/ChatWindow";
+import ZoomControl from "@/components/ui/ZoomControl";
 import QRGenerator from "@/components/pairing/QRgenerator";
 import SettingsPanel from "@/components/settings/SettingsPanel";
 import { useChatStore } from "@/store/chatStore";
+import { useDeviceStore } from "@/store/deviceStore";
 
 function DashboardContent() {
   const searchParams = useSearchParams();
@@ -14,6 +16,11 @@ function DashboardContent() {
   const [selectedDevice, setSelectedDevice] = useState<{ id: string; name: string; profileImage?: string } | null>(null);
   const [search, setSearch] = useState("");
   const { isConnected } = useChatStore();
+  const { devices } = useDeviceStore();
+
+  const liveDevice = selectedDevice ? devices.find((d) => d.device_id === selectedDevice.id) : null;
+  const currentDeviceName = liveDevice?.device_name || selectedDevice?.name || "";
+  const currentProfileImage = liveDevice?.profile_image !== undefined ? liveDevice.profile_image : selectedDevice?.profileImage;
 
   const handleDeviceSelect = useCallback((id: string, name: string, profileImage?: string) => {
     setSelectedDevice({ id, name, profileImage });
@@ -41,11 +48,8 @@ function DashboardContent() {
               />
             </div>
             <div className="flex items-center gap-2">
-              {/* "All ▾" pill */}
-              <button className="flex items-center gap-1 px-3 py-1 rounded-full border border-[var(--color-outline-variant)] text-[13px] font-medium text-[var(--color-on-surface)] hover:bg-[var(--color-surface-container-low)] transition-colors">
-                All
-                <span className="material-symbols-outlined text-[14px]">expand_more</span>
-              </button>
+              {/* In-app Zoom Control */}
+              <ZoomControl />
               {/* New chat icon */}
               <button
                 onClick={() => window.history.pushState(null, "", "/?view=pairing")}
@@ -101,7 +105,7 @@ function DashboardContent() {
 
           {view === "chat" && (
             selectedDevice ? (
-              <ChatWindow deviceId={selectedDevice.id} deviceName={selectedDevice.name} profileImage={selectedDevice.profileImage} />
+              <ChatWindow deviceId={selectedDevice.id} deviceName={currentDeviceName} profileImage={currentProfileImage} />
             ) : (
               /* Empty state — matches the screenshot */
               <div className="flex-1 flex flex-col items-center justify-center gap-5 p-8">

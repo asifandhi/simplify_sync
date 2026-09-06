@@ -147,11 +147,17 @@ export const useChatStore = create<ChatStore>()(
             });
           });
 
-          socket.on('profile_synced', (data: { device_id: string, profile_image: string }) => {
+          socket.on('profile_synced', (data: { device_id: string; profile_image?: string; device_name?: string }) => {
             import('./deviceStore').then(({ useDeviceStore }) => {
               const { devices, setDevices } = useDeviceStore.getState();
               const newDevices = devices.map(d => 
-                d.device_id === data.device_id ? { ...d, profile_image: data.profile_image } : d
+                d.device_id === data.device_id
+                  ? {
+                      ...d,
+                      ...(data.profile_image ? { profile_image: data.profile_image } : {}),
+                      ...(data.device_name ? { device_name: data.device_name } : {}),
+                    }
+                  : d
               );
               setDevices(newDevices);
             });

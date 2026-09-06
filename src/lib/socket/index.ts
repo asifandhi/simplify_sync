@@ -1,4 +1,4 @@
-import { insertChatMessage, getDeviceBySessionToken, updateDeviceProfileImage, deleteMultipleChatMessages, deleteAllChatMessages, updateDeviceLastActive } from "@/db/sqlite";
+import { insertChatMessage, getDeviceBySessionToken, updateDeviceProfileImage, updateDeviceProfile, deleteMultipleChatMessages, deleteAllChatMessages, updateDeviceLastActive } from "@/db/sqlite";
 import { Server as HTTPServer } from "http";
 import fs from "fs";
 import path from "path";
@@ -220,36 +220,57 @@ export function initSocket(server: HTTPServer) {
       socket.to(actualDeviceId).emit(SocketEvents.CHAT_SYNC_READY, { device_id: actualDeviceId });
     });
 
-    socket.on(SocketEvents.SYNC_PROFILE, (data: { device_id: string, base64_image: string }) => {
-      const actualDeviceId = socket.data.device_id;
-      if (!actualDeviceId || actualDeviceId !== data.device_id) return;
-      
+    socket.on(SocketEvents.SYNC_PROFILE, (data: { device_id?: string; base64_image?: string; device_name?: string }) => {
+      const actualDeviceId = socket.data.device_id || data.device_id;
+      if (!actualDeviceId) return;
+
       try {
-        const matches = data.base64_image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-        let base64Data = data.base64_image;
-        let ext = 'jpg';
-        
-        if (matches && matches.length === 3) {
-          ext = matches[1].split('/')[1] || 'jpg';
-          base64Data = matches[2];
+        let fileUrl: string | undefined = undefined;
+        let updatedName: string | undefined = undefined;
+
+        if (data.device_name && typeof data.device_name === "string" && data.device_name.trim()) {
+          updatedName = data.device_name.trim();
         }
 
-        const fileName = `android-${actualDeviceId}-${Date.now()}.${ext}`;
-        const dirPath = path.join(process.cwd(), "public", "uploads", "profiles");
-        
-        if (!fs.existsSync(dirPath)) {
-          fs.mkdirSync(dirPath, { recursive: true });
+        if (data.base64_image) {
+          const matches = data.base64_image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+          let base64Data = data.base64_image;
+          let ext = "jpg";
+
+          if (matches && matches.length === 3) {
+            ext = matches[1].split("/")[1] || "jpg";
+            base64Data = matches[2];
+          }
+
+          const fileName = `android-${actualDeviceId}-${Date.now()}.${ext}`;
+          const dirPath = path.join(process.cwd(), "public", "uploads", "profiles");
+
+          if (!fs.existsSync(dirPath)) {
+            fs.mkdirSync(dirPath, { recursive: true });
+          }
+
+          const filePath = path.join(dirPath, fileName);
+          fs.writeFileSync(filePath, base64Data, "base64");
+          fileUrl = `/uploads/profiles/${fileName}`;
         }
-        
-        const filePath = path.join(dirPath, fileName);
-        fs.writeFileSync(filePath, base64Data, 'base64');
-        
-        const fileUrl = `/uploads/profiles/${fileName}`;
-        updateDeviceProfileImage(actualDeviceId, fileUrl);
-        
-        if (process.env.NODE_ENV === "development") console.log(`[Socket] Profile synced for ${actualDeviceId}: ${fileUrl}`);
-        // Notify web UI to refresh
-        socket.to(actualDeviceId).emit(SocketEvents.PROFILE_SYNCED, { device_id: actualDeviceId, profile_image: fileUrl });
+
+        if (updatedName || fileUrl) {
+          updateDeviceProfile(actualDeviceId, {
+            device_name: updatedName,
+            profile_image: fileUrl,
+          });
+
+          if (process.env.NODE_ENV === "development") {
+            console.log(`[Socket] Profile synced for ${actualDeviceId} — name: "${updatedName}", image: "${fileUrl}"`);
+          }
+
+          // Broadcast to all connected web clients so sidebar & active chat header update live
+          io.emit(SocketEvents.PROFILE_SYNCED, {
+            device_id: actualDeviceId,
+            profile_image: fileUrl,
+            device_name: updatedName,
+          });
+        }
       } catch (err) {
         if (process.env.NODE_ENV === "development") console.error("[Socket] Failed to save synced profile photo:", err);
       }

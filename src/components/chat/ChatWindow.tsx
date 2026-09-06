@@ -43,6 +43,17 @@ function dateMaker(date?: string | Date): string {
     year: "numeric",
   });
 }
+
+function getMsgKey(msg: { id?: number; sender?: string; timestamp?: string }, fallbackIdx?: number): string {
+  if (msg.id !== undefined && msg.id !== null) return `id-${msg.id}`;
+  return `msg-${msg.sender || ""}-${msg.timestamp || ""}${fallbackIdx !== undefined ? `-${fallbackIdx}` : ""}`;
+}
+
+function isImageMessage(msg: { content_type?: string; content?: string }): boolean {
+  if (msg.content_type === "image") return true;
+  if (msg.content_type === "file" && msg.content?.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null) return true;
+  return false;
+}
 function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
   const { enableDoubleClickCopy } = useUserStore();
 
@@ -66,8 +77,95 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
 
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [showMenu, setShowMenu] = useState(false);
   const [showClearChatModal, setShowClearChatModal] = useState(false);
+
+  // 3-Dot Dropdown Menu State & Lifecycle
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMenuClosing, setIsMenuClosing] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const openMenu = () => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    setIsMenuClosing(false);
+    setIsMenuOpen(true);
+  };
+
+  const closeMenu = (immediate = false) => {
+    if (immediate) {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+        closeTimeoutRef.current = null;
+      }
+      setIsMenuClosing(false);
+      setIsMenuOpen(false);
+      return;
+    }
+
+    if (!isMenuOpen || isMenuClosing) return;
+
+    setIsMenuClosing(true);
+    closeTimeoutRef.current = setTimeout(() => {
+      setIsMenuOpen(false);
+      setIsMenuClosing(false);
+      closeTimeoutRef.current = null;
+    }, 120);
+  };
+
+  const toggleMenu = () => {
+    if (isMenuOpen && !isMenuClosing) {
+      closeMenu();
+    } else {
+      openMenu();
+    }
+  };
+
+  // Close dropdown on click outside or Escape key
+  useEffect(() => {
+    if (!isMenuOpen || isMenuClosing) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeMenu();
+      }
+    };
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node) &&
+        !menuButtonRef.current?.contains(e.target as Node)
+      ) {
+        closeMenu();
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMenuOpen, isMenuClosing]);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Track message IDs for entrance animations (only new live messages animate)
+  const initialLoadDoneRef = useRef(false);
+  const knownMessageKeysRef = useRef<Set<string>>(new Set());
+  const liveMessageKeysRef = useRef<Set<string>>(new Set());
   const [clearChatSync, setClearChatSync] = useState(false);
 
   const { deleteMessages } = useChatStore();
@@ -81,6 +179,9 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
 
   // Ref to track the last message ID to avoid triggering on pagination (prepend)
   const lastMessageIdRef = useRef<string | number | null>(null);
+
+  // Ref to track when an internal chat image/file is being dragged outward
+  const isDraggingInternalRef = useRef(false);
 
   // Helper: check if user is within 150px of the bottom
   const isNearBottom = () => {
@@ -143,11 +244,14 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
   const clearChat = () => {
     deleteMessages('all', clearChatSync);
     setShowClearChatModal(false);
-    setShowMenu(false);
+    closeMenu(true);
   };
 
   useEffect(() => {
     if (!deviceId) return;
+    initialLoadDoneRef.current = false;
+    knownMessageKeysRef.current.clear();
+    liveMessageKeysRef.current.clear();
     setMessages([]);
     setOffset(0);
     setHasMore(true);
@@ -155,6 +259,12 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
       .get(`/api/chat?device_id=${deviceId}&limit=${limit}&offset=0`)
       .then((res) => {
         const newMsgs = res.data.data.messages;
+        if (Array.isArray(newMsgs)) {
+          newMsgs.forEach((m: any, i: number) => {
+            knownMessageKeysRef.current.add(getMsgKey(m, i));
+          });
+        }
+        initialLoadDoneRef.current = true;
         setMessages(newMsgs);
         if (newMsgs.length < limit) setHasMore(false);
         // Scroll to bottom immediately on first load
@@ -236,6 +346,11 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
       }
 
       if (olderMsgs.length > 0) {
+        if (Array.isArray(olderMsgs)) {
+          olderMsgs.forEach((m: any, i: number) => {
+            knownMessageKeysRef.current.add(getMsgKey(m, i));
+          });
+        }
         setOffset(nextOffset);
         // Prepend older messages
         setMessages([...olderMsgs, ...messages]);
@@ -301,6 +416,7 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
   };
 
   const handleDragOver = (e: React.DragEvent) => {
+    if (isDraggingInternalRef.current) return;
     e.preventDefault();
     setIsDragging(true);
   };
@@ -313,6 +429,7 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
+    if (isDraggingInternalRef.current) return;
     const file = e.dataTransfer.files?.[0];
     if (file) processFile(file);
   };
@@ -325,30 +442,94 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
     }
   };
 
+  const handleImageDragStart = (
+    e: React.DragEvent<HTMLImageElement>,
+    fileUrl: string,
+    fileName: string,
+  ) => {
+    isDraggingInternalRef.current = true;
+    const ext = fileName.split(".").pop()?.toLowerCase() || "jpeg";
+    const mime =
+      ext === "png"
+        ? "image/png"
+        : ext === "webp"
+        ? "image/webp"
+        : ext === "gif"
+        ? "image/gif"
+        : "image/jpeg";
+    const fullUrl =
+      typeof window !== "undefined"
+        ? new URL(fileUrl, window.location.origin).href
+        : fileUrl;
+
+    e.dataTransfer.setData("DownloadURL", `${mime}:${fileName}:${fullUrl}`);
+    e.dataTransfer.setData("text/uri-list", fullUrl);
+    e.dataTransfer.setData("text/plain", fullUrl);
+  };
+
+  const handleImageDragEnd = () => {
+    isDraggingInternalRef.current = false;
+  };
+
   const renderBubbleContent = (msg: any, isMe: boolean = false) => {
-    if (msg.content_type === "file") {
-      const isImage = msg.content?.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null;
-      const fileUrl = `/api/file?path=${msg.file_path}`;
-
-      if (isImage) {
-        return (
-          <div className="flex flex-col gap-2">
-            <img
-              src={fileUrl}
-              alt={msg.content}
-              className={`rounded-lg max-w-full h-auto max-h-48 object-cover border ${isMe ? "border-white/20" : "border-[var(--color-outline-variant)]"}`}
-            />
-            <a
-              href={fileUrl}
-              download={msg.content}
-              className={`text-xs underline text-center font-label-sm ${isMe ? "text-white/90 hover:text-white" : "opacity-80 hover:opacity-100"}`}
+    const isImage = isImageMessage(msg);
+    if (isImage) {
+      const fileUrl = msg.file_url || `/api/file?path=${msg.file_path}`;
+      return (
+        <div className="relative group overflow-hidden rounded-xl w-[220px] sm:w-[260px] max-w-full">
+          <img
+            src={fileUrl}
+            alt={msg.content || "Image"}
+            draggable={true}
+            onDragStart={(e) =>
+              handleImageDragStart(e, fileUrl, msg.content || "image.png")
+            }
+            onDragEnd={handleImageDragEnd}
+            className={`rounded-xl w-full h-auto max-h-48 sm:max-h-52 object-cover cursor-grab active:cursor-grabbing border ${
+              isMe ? "border-white/20" : "border-[var(--color-outline-variant)]"
+            }`}
+          />
+          <a
+            href={fileUrl}
+            download={msg.content || "image"}
+            onClick={(e) => e.stopPropagation()}
+            className={`absolute bottom-1.5 left-2    rounded-full bg-black/50 hover:bg-black/75 text-white backdrop-blur-xs shadow-md transition-all hover:scale-110 flex items-center justify-center cursor-pointer`}
+            title="Download Image"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              shapeRendering="geometricPrecision"
+              textRendering="geometricPrecision"
+              imageRendering="optimizeQuality"
+              fillRule="evenodd"
+              clipRule="evenodd"
+              viewBox="0 0 512 512"
+              className="w-4 h-4 fill-current"
             >
-              Download Image
-            </a>
-          </div>
-        );
-      }
+              <path
+                fill="currentColor"
+                d="M512 256c0-70.67-28.66-134.68-74.98-181.02C390.69 28.66 326.68 0 256 0S121.31 28.66 74.98 74.98C28.66 121.32 0 185.33 0 256c0 70.68 28.66 134.69 74.98 181.02C121.31 483.34 185.32 512 256 512c70.67 0 134.69-28.66 181.02-74.98C483.34 390.69 512 326.68 512 256zm-160.23-21.5h-43.38v-67.93c0-7.63-6.27-13.9-13.91-13.9H217.5c-7.62 0-13.9 6.25-13.9 13.9v67.92h-43.41c-16.71 0-25.11 19.9-14.05 31.96l96.01 112.05c7.54 9.12 21.31 9.12 29.04.37l94.96-112.8c10.83-12.43 1.66-31.55-14.38-31.57z"
+              />
+            </svg>
+          </a>
+          {msg.timestamp && (
+            <div className="absolute bottom-1.5 right-2 rounded-md bg-transparent text-white  text-[10px] flex items-center gap-1 select-none shadow-md pointer-events-none">
+              <span>{formatMessageTime(msg.timestamp)}</span>
+              {isMe && (
+                <img 
+                  src="/icons/sent.svg" 
+                  className="w-[10px] h-[10px] opacity-90 brightness-0 invert" 
+                  alt="Sent" 
+                />
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
 
+    if (msg.content_type === "file") {
+      const fileUrl = msg.file_url || `/api/file?path=${msg.file_path}`;
       return (
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-[18px]">draft</span>
@@ -404,6 +585,17 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
       </div>
     );
   };
+
+  // Track newly arrived live messages for entrance animation (only new live messages animate)
+  if (initialLoadDoneRef.current) {
+    for (let i = 0; i < messages.length; i++) {
+      const key = getMsgKey(messages[i], i);
+      if (!knownMessageKeysRef.current.has(key)) {
+        knownMessageKeysRef.current.add(key);
+        liveMessageKeysRef.current.add(key);
+      }
+    }
+  }
 
   return (
     <div
@@ -482,31 +674,39 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
 
           <div className="flex items-center gap-2 relative">
             <button
-              onClick={() => setShowMenu(!showMenu)}
+              ref={menuButtonRef}
+              onClick={toggleMenu}
               className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container)] transition-colors"
               title="More options"
+              aria-expanded={isMenuOpen}
+              aria-haspopup="true"
             >
               <span className="material-symbols-outlined text-[22px]">
                 more_vert
               </span>
             </button>
             
-            {showMenu && (
-              <div className="absolute right-0 top-12 w-48 bg-[var(--color-surface-container-high)] border border-[var(--color-outline-variant)]/30 rounded-md shadow-lg overflow-hidden z-50">
+            {isMenuOpen && (
+              <div
+                ref={menuRef}
+                className={`absolute right-0 top-12 w-48 bg-[var(--color-surface-container-high)] border border-[var(--color-outline-variant)]/30 rounded-md shadow-lg overflow-hidden z-50 ${
+                  isMenuClosing ? "animate-menu-out" : "animate-menu-in"
+                }`}
+              >
                 <button
-                  className="w-full text-left px-4 py-3 text-sm text-[var(--color-on-surface)] hover:bg-[var(--color-surface-container-highest)]"
+                  className="w-full text-left px-4 py-3 text-sm text-[var(--color-on-surface)] hover:bg-[var(--color-surface-container-highest)] transition-colors"
                   onClick={() => {
                     setIsSelectionMode(true);
-                    setShowMenu(false);
+                    closeMenu(true);
                   }}
                 >
                   Select Messages
                 </button>
                 <button
-                  className="w-full text-left px-4 py-3 text-sm text-red-500 hover:bg-[var(--color-surface-container-highest)]"
+                  className="w-full text-left px-4 py-3 text-sm text-red-500 hover:bg-[var(--color-surface-container-highest)] transition-colors"
                   onClick={() => {
                     setShowClearChatModal(true);
-                    setShowMenu(false);
+                    closeMenu(true);
                   }}
                 >
                   Clear Chat
@@ -528,6 +728,14 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
           // 'me' = sent from this web UI
           // anything else ('android-xxx', 'pc', etc.) = received from phone
           const isMe = msg.sender === "me";
+          const msgKey = getMsgKey(msg, idx);
+          const isLive = liveMessageKeysRef.current.has(msgKey);
+          const animationClass = isLive
+            ? (isMe ? "animate-message-sent" : "animate-message-received")
+            : "";
+
+          const isImg = isImageMessage(msg);
+
           // Shows badge on the first message (when conversation began)
           // and whenever the day changes from the previous message
           const showDateHeader =
@@ -547,7 +755,7 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
 
               {/* Message Bubble */}
               <div
-                className={`flex flex-col max-w-[85%] md:max-w-[70%] gap-1 group relative ${isMe ? "self-end items-end" : "self-start"} ${isSelectionMode ? "cursor-pointer" : ""}`}
+                className={`flex flex-col ${isImg ? "max-w-[260px] sm:max-w-[300px]" : "max-w-[85%] md:max-w-[70%]"} gap-1 group relative ${isMe ? "self-end items-end" : "self-start"} ${isSelectionMode ? "cursor-pointer" : ""} ${animationClass}`}
                 onClick={() => {
                   if (isSelectionMode && msg.id) {
                     toggleSelection(msg.id);
@@ -555,12 +763,20 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
                 }}
               >
                 <div
-                  className={`flex items-end gap-1.5 py-1 rounded-2xl font-body-md leading-relaxed ${
+                  className={`${
+                    isImg
+                      ? "flex flex-col px-1 pt-1 rounded-lg font-body-md leading-relaxed"
+                      : "flex items-end gap-1.5 py-1 rounded-2xl font-body-md leading-relaxed"
+                  } ${
                     !isSelectionMode && enableDoubleClickCopy ? "cursor-pointer select-none" : ""
                   } ${
                     isMe
-                      ? "bg-[#1E9CF1] text-white rounded-tr-sm shadow-sm pl-3.5 pr-2"
-                      : "bg-[var(--color-surface-container-high)] text-[var(--color-on-surface)] rounded-tl-sm border border-transparent pl-2.5 pr-3.5"
+                      ? isImg
+                        ? "bg-[#1E9CF1] text-white rounded-tr-sm shadow-sm"
+                        : "bg-[#1E9CF1] text-white rounded-tr-sm shadow-sm pl-3.5 pr-2"
+                      : isImg
+                        ? "bg-[var(--color-surface-container-high)] text-[var(--color-on-surface)] rounded-tl-sm border border-transparent"
+                        : "bg-[var(--color-surface-container-high)] text-[var(--color-on-surface)] rounded-tl-sm border border-transparent pl-2.5 pr-3.5"
                   } ${msg.id && selectedIds.has(msg.id) ? "opacity-75 ring-2 ring-white/50" : ""}`}
                   onDoubleClick={() => {
                     if (!isSelectionMode && enableDoubleClickCopy && msg.content) {
@@ -574,7 +790,7 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
                 >
                   {renderBubbleContent(msg, isMe)}
 
-                  {msg.timestamp && (
+                  {!isImg && msg.timestamp && (
                     <div
                       className={`text-[9px] shrink-0 pb-0.5 select-none flex items-center gap-1 ${
                         isMe

@@ -6,7 +6,7 @@ import { useUserStore } from "@/store/userStore";
 import { useChatStore } from "@/store/chatStore";
 
 export default function NavigationRail() {
-  const { profileImage, theme, setTheme } = useUserStore();
+  const { profileImage, theme, setTheme, zoomLevel } = useUserStore();
   const isConnected = useChatStore((s) => s.isConnected);
 
   const toggleTheme = () => {
@@ -23,6 +23,12 @@ export default function NavigationRail() {
       document.documentElement.classList.add("dark");
     }
   }, [theme]);
+
+  React.useEffect(() => {
+    if (typeof zoomLevel === "number") {
+      document.documentElement.style.setProperty("--app-zoom", (zoomLevel / 100).toString());
+    }
+  }, [zoomLevel]);
 
   return (
     <nav className="w-[var(--spacing-nav-rail-width)] h-full bg-[var(--color-surface-container-lowest)] border-r border-[var(--color-outline-variant)] flex flex-col items-center py-[var(--spacing-stack-lg)] justify-between shrink-0 z-20">

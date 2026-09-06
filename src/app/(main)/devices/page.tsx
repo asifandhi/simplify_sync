@@ -3,9 +3,15 @@
 import React, { useState } from "react";
 import DeviceManager from "@/components/devices/DeviceManager";
 import ChatWindow from "@/components/chat/ChatWindow";
+import { useDeviceStore } from "@/store/deviceStore";
 
 export default function DevicesPage() {
-  const [selectedDevice, setSelectedDevice] = useState<{ id: string; name: string } | null>(null);
+  const [selectedDevice, setSelectedDevice] = useState<{ id: string; name: string; profileImage?: string } | null>(null);
+  const { devices } = useDeviceStore();
+
+  const liveDevice = selectedDevice ? devices.find((d) => d.device_id === selectedDevice.id) : null;
+  const currentDeviceName = liveDevice?.device_name || selectedDevice?.name || "";
+  const currentProfileImage = liveDevice?.profile_image !== undefined ? liveDevice.profile_image : selectedDevice?.profileImage;
 
   return (
     <div className="h-full flex gap-4">
@@ -16,14 +22,14 @@ export default function DevicesPage() {
           <p className="text-sm text-gray-500">Select a device to interact.</p>
         </div>
         <div className="flex-1 overflow-y-auto p-4">
-          <DeviceManager onSelectDevice={(id, name) => setSelectedDevice({ id, name })} />
+          <DeviceManager onSelectDevice={(id, name, profileImage) => setSelectedDevice({ id, name, profileImage })} />
         </div>
       </div>
 
       {/* Main Content: Chat Window */}
       <div className="flex-1 rounded-2xl overflow-hidden relative">
         {selectedDevice ? (
-          <ChatWindow deviceId={selectedDevice.id} deviceName={selectedDevice.name} />
+          <ChatWindow deviceId={selectedDevice.id} deviceName={currentDeviceName} profileImage={currentProfileImage} />
         ) : (
           <div className="h-full w-full glass rounded-2xl flex flex-col items-center justify-center border border-dashed border-[var(--primary)]/30">
             <div className="p-4 bg-[var(--primary)]/10 text-[var(--primary)] rounded-full mb-4">

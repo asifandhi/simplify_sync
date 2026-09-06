@@ -224,6 +224,25 @@ export function updateDeviceProfileImage(device_id: string, profile_image: strin
   return stmt.run(profile_image, device_id);
 }
 
+
+export function updateDeviceName(device_id: string, device_name: string) {
+  const stmt = db.prepare(`UPDATE devices SET device_name = ? WHERE device_id = ?`);
+  return stmt.run(device_name, device_id);
+}
+
+export function updateDeviceProfile(device_id: string, updates: { device_name?: string; profile_image?: string }) {
+  if (updates.device_name && updates.profile_image) {
+    const stmt = db.prepare(`UPDATE devices SET device_name = ?, profile_image = ? WHERE device_id = ?`);
+    return stmt.run(updates.device_name, updates.profile_image, device_id);
+  } else if (updates.device_name) {
+    const stmt = db.prepare(`UPDATE devices SET device_name = ? WHERE device_id = ?`);
+    return stmt.run(updates.device_name, device_id);
+  } else if (updates.profile_image) {
+    const stmt = db.prepare(`UPDATE devices SET profile_image = ? WHERE device_id = ?`);
+    return stmt.run(updates.profile_image, device_id);
+  }
+}
+
 export function deleteDevice(deviceId: string) {
   try {
     // 1. Find all files associated with this device to clean them up from disk
