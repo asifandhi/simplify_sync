@@ -49,9 +49,11 @@ function getMsgKey(msg: { id?: number; sender?: string; timestamp?: string }, fa
   return `msg-${msg.sender || ""}-${msg.timestamp || ""}${fallbackIdx !== undefined ? `-${fallbackIdx}` : ""}`;
 }
 
-function isImageMessage(msg: { content_type?: string; content?: string }): boolean {
+function isImageMessage(msg: { content_type?: string; content?: string; file_path?: string }): boolean {
   if (msg.content_type === "image") return true;
   if (msg.content_type === "file" && msg.content?.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null) return true;
+  if (msg.file_path?.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null) return true;
+  if (msg.content?.startsWith("image:") || msg.file_path?.includes("-image_") || msg.file_path?.includes("-image")) return true;
   return false;
 }
 function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
@@ -74,6 +76,17 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
   const [copiedMessageId, setCopiedMessageId] = useState<
     string | number | null
   >(null);
+  const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && previewImage) {
+        setPreviewImage(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [previewImage]);
 
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -381,10 +394,11 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
     try {
       const res = await axios.post("/api/upload", formData);
       if (res.data.success) {
+        const isImg = file.type.startsWith("image/") || /\.(jpeg|jpg|gif|png|webp)$/i.test(file.name);
         sendMessage({
           device_id: deviceId,
           sender: "me",
-          content_type: "file",
+          content_type: isImg ? "image" : "file",
           content: res.data.data.file_name,
           file_path: res.data.data.file_path,
         });
@@ -471,12 +485,53 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
     isDraggingInternalRef.current = false;
   };
 
+  const handleDownload = async (e: React.MouseEvent, url: string, rawFilename?: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    try {
+      let filename = (rawFilename || "download").replace(/[\\/:*?"<>|]/g, "_");
+      const downloadUrl = url.includes("?") ? `${url}&download=1` : `${url}?download=1`;
+      const res = await fetch(downloadUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+
+      if (!filename.includes(".")) {
+        const mime = blob.type;
+        if (mime === "image/png") filename += ".png";
+        else if (mime === "image/jpeg") filename += ".jpg";
+        else if (mime === "image/webp") filename += ".webp";
+        else if (mime === "image/gif") filename += ".gif";
+        else if (mime === "application/pdf") filename += ".pdf";
+        else filename += ".jpg";
+      }
+
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Download failed, falling back to direct link", err);
+      window.open(url, "_blank");
+    }
+  };
+
   const renderBubbleContent = (msg: any, isMe: boolean = false) => {
     const isImage = isImageMessage(msg);
     if (isImage) {
       const fileUrl = msg.file_url || `/api/file?path=${msg.file_path}`;
       return (
-        <div className="relative group overflow-hidden rounded-xl w-[220px] sm:w-[260px] max-w-full">
+        <div
+          className="relative group overflow-hidden rounded-xl w-[220px] sm:w-[260px] max-w-full cursor-pointer"
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            setPreviewImage({ url: fileUrl, name: msg.content || "Image" });
+          }}
+          title="Double-click to preview"
+        >
           <img
             src={fileUrl}
             alt={msg.content || "Image"}
@@ -489,11 +544,10 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
               isMe ? "border-white/20" : "border-[var(--color-outline-variant)]"
             }`}
           />
-          <a
-            href={fileUrl}
-            download={msg.content || "image"}
-            onClick={(e) => e.stopPropagation()}
-            className={`absolute bottom-1.5 left-2    rounded-full bg-black/50 hover:bg-black/75 text-white backdrop-blur-xs shadow-md transition-all hover:scale-110 flex items-center justify-center cursor-pointer`}
+          <button
+            type="button"
+            onClick={(e) => handleDownload(e, fileUrl, msg.content || "image")}
+            className="absolute bottom-1.5 left-2 w-7 h-7 rounded-full bg-black/50 hover:bg-black/75 text-white backdrop-blur-xs shadow-md transition-all hover:scale-110 flex items-center justify-center cursor-pointer"
             title="Download Image"
           >
             <svg
@@ -511,7 +565,7 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
                 d="M512 256c0-70.67-28.66-134.68-74.98-181.02C390.69 28.66 326.68 0 256 0S121.31 28.66 74.98 74.98C28.66 121.32 0 185.33 0 256c0 70.68 28.66 134.69 74.98 181.02C121.31 483.34 185.32 512 256 512c70.67 0 134.69-28.66 181.02-74.98C483.34 390.69 512 326.68 512 256zm-160.23-21.5h-43.38v-67.93c0-7.63-6.27-13.9-13.91-13.9H217.5c-7.62 0-13.9 6.25-13.9 13.9v67.92h-43.41c-16.71 0-25.11 19.9-14.05 31.96l96.01 112.05c7.54 9.12 21.31 9.12 29.04.37l94.96-112.8c10.83-12.43 1.66-31.55-14.38-31.57z"
               />
             </svg>
-          </a>
+          </button>
           {msg.timestamp && (
             <div className="absolute bottom-1.5 right-2 rounded-md bg-transparent text-white  text-[10px] flex items-center gap-1 select-none shadow-md pointer-events-none">
               <span>{formatMessageTime(msg.timestamp)}</span>
@@ -533,13 +587,13 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
       return (
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-[18px]">draft</span>
-          <a
-            href={fileUrl}
-            download={msg.content}
-            className={`underline break-all text-sm font-medium ${isMe ? "text-white hover:text-white/80" : "hover:opacity-80"}`}
+          <button
+            type="button"
+            onClick={(e) => handleDownload(e, fileUrl, msg.content || "file")}
+            className={`underline break-all text-sm font-medium text-left cursor-pointer ${isMe ? "text-white hover:text-white/80" : "hover:opacity-80"}`}
           >
             {msg.content}
-          </a>
+          </button>
         </div>
       );
     }
@@ -779,6 +833,11 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
                         : "bg-[var(--color-surface-container-high)] text-[var(--color-on-surface)] rounded-tl-sm border border-transparent pl-2.5 pr-3.5"
                   } ${msg.id && selectedIds.has(msg.id) ? "opacity-75 ring-2 ring-white/50" : ""}`}
                   onDoubleClick={() => {
+                    if (isImg) {
+                      const fileUrl = (msg as any).file_url || `/api/file?path=${msg.file_path}`;
+                      setPreviewImage({ url: fileUrl, name: msg.content || "Image" });
+                      return;
+                    }
                     if (!isSelectionMode && enableDoubleClickCopy && msg.content) {
                       navigator.clipboard.writeText(msg.content);
                       const id = msg.id || `fallback-${idx}`;
@@ -786,7 +845,13 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
                       setTimeout(() => setCopiedMessageId(null), 1500);
                     }
                   }}
-                  title={!isSelectionMode && enableDoubleClickCopy ? "Double-click to copy" : ""}
+                  title={
+                    isImg
+                      ? "Double-click to preview"
+                      : !isSelectionMode && enableDoubleClickCopy
+                        ? "Double-click to copy"
+                        : ""
+                  }
                 >
                   {renderBubbleContent(msg, isMe)}
 
@@ -1002,6 +1067,38 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
                 Clear Chat
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox / Fullscreen Image Preview */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            className="relative max-w-5xl max-h-[90vh] flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full flex items-center justify-between pb-3 text-white px-2">
+              <span className="text-sm font-medium truncate max-w-[80%]">
+                {previewImage.name}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPreviewImage(null)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition-colors cursor-pointer text-white"
+                title="Close"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            <img
+              src={previewImage.url}
+              alt={previewImage.name}
+              className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
+            />
           </div>
         </div>
       )}
