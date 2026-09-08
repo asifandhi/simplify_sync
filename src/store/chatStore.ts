@@ -12,6 +12,7 @@ export interface ChatMessage {
   preview_data?: string;
   is_view_once?: boolean;
   timestamp?: string;
+  status?: string;
 }
 
 export interface PendingMessage {
@@ -178,6 +179,19 @@ export const useChatStore = create<ChatStore>()(
                 console.error("[ChatStore] Failed to sync chat", err);
               }
             }
+          });
+
+          socket.on('messages_delivered', (data: { device_id?: string; message_ids: number[] }) => {
+            console.log('[ChatStore] messages_delivered received:', data);
+            if (!data || !Array.isArray(data.message_ids)) return;
+            const deliveredSet = new Set(data.message_ids.map(Number));
+            set((state) => ({
+              messages: state.messages.map((m) =>
+                m.id && deliveredSet.has(Number(m.id))
+                  ? { ...m, status: 'DELIVERED' }
+                  : m
+              ),
+            }));
           });
 
           socket.on('delete_messages', (data: { device_id?: string; message_ids: number[] | 'all' }) => {

@@ -1,4 +1,4 @@
-import { getChatByDeviceId, insertChatMessage, deleteMultipleChatMessages, deleteAllChatMessages } from "@/db/sqlite";
+import { getChatByDeviceId, getPendingChatMessages, insertChatMessage, deleteMultipleChatMessages, deleteAllChatMessages } from "@/db/sqlite";
 import { ApiResponse } from "@/lib/utils/ApiResponse";
 import { asyncHandler } from "@/lib/utils/asyncHandler";
 import { fetchOpenGraph } from "@/lib/utils/openGraph";
@@ -20,6 +20,11 @@ export const GET = asyncHandler(async (request: Request) => {
     return ApiResponse.error("Unauthorized: Cannot access other device's chat", 403);
   }
   
+  if (searchParams.get("pending") === "true") {
+    const pendingMessages = getPendingChatMessages(device_id);
+    return ApiResponse.success({ messages: pendingMessages });
+  }
+
   const limit = parseInt(searchParams.get("limit") || "50", 10);
   const offset = parseInt(searchParams.get("offset") || "0", 10);
   

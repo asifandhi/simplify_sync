@@ -10,6 +10,11 @@ export const SocketEvents = {
   SEND_MESSAGE: "send_message",
   RECEIVE_MESSAGE: "receive_message",
   DELETE_MESSAGES: "delete_messages",
+  MARK_DELIVERED: "mark_delivered",
+  MESSAGES_DELIVERED: "messages_delivered",
+  PENDING_MESSAGES: "pending_messages",
+  PENDING_ACTIONS: "pending_actions",
+  CLEAR_CHAT_ACK: "clear_chat_ack",
 
   // ── Chat sync ──────────────────────────────────────────────
   REQUEST_CHAT_SYNC: "request_chat_sync",

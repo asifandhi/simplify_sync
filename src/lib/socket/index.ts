@@ -1,4 +1,4 @@
-import { insertChatMessage, getDeviceBySessionToken, updateDeviceProfileImage, updateDeviceProfile, deleteMultipleChatMessages, deleteAllChatMessages, updateDeviceLastActive } from "@/db/sqlite";
+import { insertChatMessage, getDeviceBySessionToken, updateDeviceProfileImage, updateDeviceProfile, deleteMultipleChatMessages, deleteAllChatMessages, updateDeviceLastActive, getPendingChatMessages, markMessagesDelivered, insertPendingAction, getPendingActions, markActionApplied } from "@/db/sqlite";
 import { Server as HTTPServer } from "http";
 import fs from "fs";
 import path from "path";
@@ -213,11 +213,56 @@ export function initSocket(server: HTTPServer) {
       }
     });
 
-    socket.on(SocketEvents.REQUEST_CHAT_SYNC, (data) => {
-      const actualDeviceId = socket.data.device_id;
-      if (!actualDeviceId || actualDeviceId !== data.device_id) return;
-      if (process.env.NODE_ENV === "development") console.log(`[Socket] Chat sync requested by mobile: ${actualDeviceId}`);
+    socket.on(SocketEvents.REQUEST_CHAT_SYNC, (data?: { device_id?: string }) => {
+      const actualDeviceId = socket.data.device_id || data?.device_id;
+      if (!actualDeviceId) return;
+      if (process.env.NODE_ENV === "development") console.log(`[Socket] Chat sync requested for device: ${actualDeviceId}`);
+      
+      // Deliver any pending clear-chat actions FIRST (so older messages are cleared before new ones arrive)
+      const pendingActions = getPendingActions(actualDeviceId);
+      if (pendingActions && pendingActions.length > 0) {
+        if (process.env.NODE_ENV === "development") console.log(`[Socket] Sending ${pendingActions.length} pending actions to ${actualDeviceId}`);
+        socket.emit(SocketEvents.PENDING_ACTIONS, {
+          device_id: actualDeviceId,
+          actions: pendingActions,
+        });
+      }
+
+      // Deliver any pending missed messages to this device (in chronological order)
+      const pendingMessages = getPendingChatMessages(actualDeviceId);
+      if (pendingMessages && pendingMessages.length > 0) {
+        if (process.env.NODE_ENV === "development") console.log(`[Socket] Sending ${pendingMessages.length} pending messages to ${actualDeviceId}`);
+        socket.emit(SocketEvents.PENDING_MESSAGES, {
+          device_id: actualDeviceId,
+          messages: pendingMessages,
+        });
+      }
       socket.to(actualDeviceId).emit(SocketEvents.CHAT_SYNC_READY, { device_id: actualDeviceId });
+    });
+
+    socket.on(SocketEvents.MARK_DELIVERED, (data: { device_id?: string; message_ids: number[] }) => {
+      const actualDeviceId = socket.data.device_id || data?.device_id;
+      if (!actualDeviceId || !Array.isArray(data?.message_ids) || data.message_ids.length === 0) return;
+
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[Socket] Marking messages delivered for ${actualDeviceId}:`, data.message_ids);
+      }
+      markMessagesDelivered(data.message_ids, actualDeviceId);
+
+      // Broadcast to room so web UI updates indicator from pending to delivered
+      io.to(actualDeviceId).emit(SocketEvents.MESSAGES_DELIVERED, {
+        device_id: actualDeviceId,
+        message_ids: data.message_ids,
+      });
+    });
+
+    socket.on(SocketEvents.CLEAR_CHAT_ACK, (data: { device_id?: string; action_id: number }) => {
+      const actualDeviceId = socket.data.device_id || data?.device_id;
+      if (!actualDeviceId || !data?.action_id) return;
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[Socket] CLEAR_CHAT_ACK from ${actualDeviceId} for action_id: ${data.action_id}`);
+      }
+      markActionApplied(data.action_id);
     });
 
     socket.on(SocketEvents.SYNC_PROFILE, (data: { device_id?: string; base64_image?: string; device_name?: string }) => {
@@ -282,9 +327,7 @@ export function initSocket(server: HTTPServer) {
       const actualDeviceId = socket.data.device_id || payload.device_id;
       if (!actualDeviceId) return;
 
-      // For mobile: verify device_id matches authenticated identity
-      if (socket.data.device_id && socket.data.device_id !== payload.device_id) return;
-      // For web: verify socket is in the device's room
+      // Mobile is locked to its authenticated socket.data.device_id; Web must be in the device room
       if (!socket.data.device_id && !socket.rooms.has(actualDeviceId)) return;
       
       if (process.env.NODE_ENV === "development") console.log(`[Socket] Delete messages requested by ${socket.data.role} for ${actualDeviceId}:`, payload.message_ids);
@@ -295,6 +338,15 @@ export function initSocket(server: HTTPServer) {
         deleteMultipleChatMessages(payload.message_ids, actualDeviceId);
       }
       
+      // If the target device is currently offline or not on chat screen, queue the action so it applies on reconnect/open
+      const targetIsOnline = isDeviceOnline(actualDeviceId);
+      const isChatOpen = deviceChatState.get(actualDeviceId) === true;
+      if ((!targetIsOnline || !isChatOpen) && socket.data.role === 'web') {
+        const payloadStr = payload.message_ids === 'all' ? 'all' : JSON.stringify(payload.message_ids);
+        insertPendingAction(actualDeviceId, 'clear_chat', payloadStr);
+        if (process.env.NODE_ENV === "development") console.log(`[Socket] Device ${actualDeviceId} offline or chat closed — queued clear_chat pending action`);
+      }
+
       // Broadcast to everyone else in the room — always include device_id in payload
       socket.to(actualDeviceId).emit(SocketEvents.DELETE_MESSAGES, {
         device_id: actualDeviceId,

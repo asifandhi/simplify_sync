@@ -31,6 +31,14 @@ export function connectDB() {
       // Ignore if already exists
     }
 
+    // Migration for chat_history status
+    try {
+      db.exec(`ALTER TABLE chat_history ADD COLUMN status TEXT DEFAULT 'SENT';`);
+      db.exec(`UPDATE chat_history SET status = 'DELIVERED' WHERE status IS NULL;`);
+    } catch (e) {
+      // Ignore if already exists
+    }
+
     db.exec(`
        CREATE TABLE IF NOT EXISTS chat_history (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,6 +51,7 @@ export function connectDB() {
             timestamp     DATETIME DEFAULT CURRENT_TIMESTAMP,
             is_view_once  INTEGER DEFAULT 0,
             is_viewed     INTEGER DEFAULT 0,
+            status        TEXT DEFAULT 'SENT',
             FOREIGN KEY (device_id) REFERENCES devices(device_id) ON DELETE CASCADE
         );
 
@@ -59,13 +68,41 @@ export function connectDB() {
 export function getChatByDeviceId(device_id: string, limit: number = 50, offset: number = 0) {
   try {
     const stmt = db.prepare(
-      `SELECT * FROM chat_history WHERE device_id = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?`,
+      `SELECT * FROM chat_history WHERE device_id = ? ORDER BY timestamp DESC, id DESC LIMIT ? OFFSET ?`,
     );
     const rows = stmt.all(device_id, limit, offset);
     return rows as any[];
   } catch (error) {
     console.error("Error fetching chat history:", error);
     return [];
+  }
+}
+
+export function getPendingChatMessages(device_id: string) {
+  try {
+    const stmt = db.prepare(
+      `SELECT * FROM chat_history WHERE device_id = ? AND status = 'SENT' AND sender NOT LIKE 'android-%' ORDER BY timestamp ASC, id ASC`,
+    );
+    const rows = stmt.all(device_id);
+    return rows as any[];
+  } catch (error) {
+    console.error("Error fetching pending chat messages:", error);
+    return [];
+  }
+}
+
+export function markMessagesDelivered(ids: number[], device_id: string) {
+  try {
+    if (!ids || ids.length === 0) return false;
+    const placeholders = ids.map(() => '?').join(',');
+    const stmt = db.prepare(
+      `UPDATE chat_history SET status = 'DELIVERED' WHERE id IN (${placeholders}) AND device_id = ?`,
+    );
+    const result = stmt.run(...ids, device_id);
+    return result.changes > 0;
+  } catch (error) {
+    console.error("Error marking messages delivered:", error);
+    return false;
   }
 }
 
@@ -89,12 +126,13 @@ interface chatMessageInput {
   file_path?: string;
   preview_data?: string;
   is_view_once?: boolean;
+  status?: string;
 }
 
 export function insertChatMessage(data: chatMessageInput) {
   try {
     const stmt = db.prepare(
-      `INSERT INTO chat_history (device_id, sender, content_type, content, file_path, preview_data, is_view_once) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO chat_history (device_id, sender, content_type, content, file_path, preview_data, is_view_once, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     const result = stmt.run(
       data.device_id,
@@ -104,6 +142,7 @@ export function insertChatMessage(data: chatMessageInput) {
       data.file_path || null,
       data.preview_data || null,
       data.is_view_once ? 1 : 0,
+      data.status || 'SENT',
     );
     if (process.env.NODE_ENV === "development") {
       console.log("Inserted chat message with ID:", result.lastInsertRowid);
@@ -271,6 +310,43 @@ export function deleteDevice(deviceId: string) {
     console.error("Error in deleteDevice:", err);
     throw err;
   }
+}
+
+// ── Pending Actions (clear-chat queue) ────────────────────────────────────
+
+function ensurePendingActionsTable() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS pending_actions (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      device_id   TEXT    NOT NULL,
+      action_type TEXT    NOT NULL,
+      payload     TEXT,
+      created_at  INTEGER NOT NULL,
+      applied     INTEGER DEFAULT 0
+    );
+  `);
+}
+
+export function insertPendingAction(device_id: string, action_type: string, payload: string) {
+  ensurePendingActionsTable();
+  const stmt = db.prepare(
+    `INSERT INTO pending_actions (device_id, action_type, payload, created_at) VALUES (?, ?, ?, ?)`
+  );
+  return stmt.run(device_id, action_type, payload, Date.now());
+}
+
+export function getPendingActions(device_id: string) {
+  ensurePendingActionsTable();
+  const stmt = db.prepare(
+    `SELECT * FROM pending_actions WHERE device_id = ? AND applied = 0 ORDER BY created_at ASC`
+  );
+  return stmt.all(device_id) as any[];
+}
+
+export function markActionApplied(action_id: number) {
+  ensurePendingActionsTable();
+  const stmt = db.prepare(`UPDATE pending_actions SET applied = 1 WHERE id = ?`);
+  return stmt.run(action_id);
 }
 
 export function getSetting(key: string) {

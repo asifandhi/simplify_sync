@@ -571,9 +571,10 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
               <span>{formatMessageTime(msg.timestamp)}</span>
               {isMe && (
                 <img 
-                  src="/icons/sent.svg" 
+                  src={msg.status === "DELIVERED" ? "/icons/sent.svg" : "/icons/pending.svg"} 
                   className="w-[10px] h-[10px] opacity-90 brightness-0 invert" 
-                  alt="Sent" 
+                  alt={msg.status === "DELIVERED" ? "Delivered" : "Sent (pending delivery)"} 
+                  title={msg.status === "DELIVERED" ? "Delivered to device" : "Sent to server (pending delivery)"}
                 />
               )}
             </div>
@@ -866,9 +867,10 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
                       <span>{formatMessageTime(msg.timestamp)}</span>
                       {isMe && (
                         <img 
-                          src="/icons/sent.svg" 
-                          className="w-[11px] h-[11px] opacity-80 brightness-0 invert" 
-                          alt="Sent" 
+                          src={msg.status === "DELIVERED" ? "/icons/sent.svg" : "/icons/pending.svg"} 
+                          className={`w-[11px] h-[11px] ${msg.status === "DELIVERED" ? "opacity-80" : "opacity-70"} brightness-0 invert`} 
+                          alt={msg.status === "DELIVERED" ? "Delivered" : "Sent (pending delivery)"} 
+                          title={msg.status === "DELIVERED" ? "Delivered to device" : "Sent to server (pending delivery)"}
                         />
                       )}
                     </div>
