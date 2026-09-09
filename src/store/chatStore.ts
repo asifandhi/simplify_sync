@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { io, Socket } from 'socket.io-client';
+import { useDeviceStore } from './deviceStore';
 
 export interface ChatMessage {
   id?: number;
@@ -92,17 +93,18 @@ export const useChatStore = create<ChatStore>()(
 
           socket.on('disconnect', () => {
             set({ isConnected: false, isDeviceOnline: false, isChatOpen: false });
+            useDeviceStore.getState().setDevices(
+              useDeviceStore.getState().devices.map((d) => ({ ...d, is_online: false }))
+            );
           });
 
           socket.on('device_presence', (data: { device_id?: string; online: boolean; is_chat_open?: boolean; last_active?: string }) => {
             console.log(`[ChatStore] Received device_presence:`, data);
             const devId = data.device_id || get().activeDeviceId;
             if (devId) {
-              import('./deviceStore').then(({ useDeviceStore }) => {
-                useDeviceStore.getState().updateDevice(devId, {
-                  is_online: data.online,
-                  last_active: data.last_active || new Date().toISOString(),
-                });
+              useDeviceStore.getState().updateDevice(devId, {
+                is_online: data.online,
+                last_active: data.last_active || new Date().toISOString(),
               });
             }
             if (!data.device_id || data.device_id === get().activeDeviceId) {
@@ -127,11 +129,9 @@ export const useChatStore = create<ChatStore>()(
             console.log(`[TRACE: WEB RECEIVE] receive_message for device: ${message.device_id} | content: ${message.content?.substring(0, 20)}...`);
             if (!message) return;
             if (message.device_id) {
-              import('./deviceStore').then(({ useDeviceStore }) => {
-                useDeviceStore.getState().updateDevice(message.device_id, {
-                  last_active: new Date().toISOString(),
-                  is_online: true,
-                });
+              useDeviceStore.getState().updateDevice(message.device_id, {
+                last_active: new Date().toISOString(),
+                is_online: true,
               });
             }
             const { activeDeviceId } = get();
@@ -149,19 +149,17 @@ export const useChatStore = create<ChatStore>()(
           });
 
           socket.on('profile_synced', (data: { device_id: string; profile_image?: string; device_name?: string }) => {
-            import('./deviceStore').then(({ useDeviceStore }) => {
-              const { devices, setDevices } = useDeviceStore.getState();
-              const newDevices = devices.map(d => 
-                d.device_id === data.device_id
-                  ? {
-                      ...d,
-                      ...(data.profile_image ? { profile_image: data.profile_image } : {}),
-                      ...(data.device_name ? { device_name: data.device_name } : {}),
-                    }
-                  : d
-              );
-              setDevices(newDevices);
-            });
+            const { devices, setDevices } = useDeviceStore.getState();
+            const newDevices = devices.map(d => 
+              d.device_id === data.device_id
+                ? {
+                    ...d,
+                    ...(data.profile_image ? { profile_image: data.profile_image } : {}),
+                    ...(data.device_name ? { device_name: data.device_name } : {}),
+                  }
+                : d
+            );
+            setDevices(newDevices);
           });
 
           socket.on('chat_sync_ready', async (data: { device_id: string }) => {
@@ -213,7 +211,11 @@ export const useChatStore = create<ChatStore>()(
         get().initSocket();
         const socket = get().socket;
 
-        set({ activeDeviceId: deviceId });
+        const currentDev = useDeviceStore.getState().devices.find((d) => d.device_id === deviceId);
+        set({
+          activeDeviceId: deviceId,
+          isDeviceOnline: currentDev?.is_online ?? false,
+        });
         console.log('[ChatStore] connectSocket called for device:', deviceId, 'socket connected:', socket?.connected);
 
         // Socket.IO buffers emits if not yet connected, so emit register directly

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, Suspense, useCallback } from "react";
+import React, { useState, useEffect, Suspense, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import DeviceManager from "@/components/devices/DeviceManager";
 import ChatWindow from "@/components/chat/ChatWindow";
@@ -15,8 +15,12 @@ function DashboardContent() {
   const view = searchParams.get("view") || "chat";
   const [selectedDevice, setSelectedDevice] = useState<{ id: string; name: string; profileImage?: string } | null>(null);
   const [search, setSearch] = useState("");
-  const { isConnected } = useChatStore();
+  const { isConnected, initSocket } = useChatStore();
   const { devices } = useDeviceStore();
+
+  useEffect(() => {
+    initSocket();
+  }, [initSocket]);
 
   const liveDevice = selectedDevice ? devices.find((d) => d.device_id === selectedDevice.id) : null;
   const currentDeviceName = liveDevice?.device_name || selectedDevice?.name || "";

@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useUserStore } from '@/store/userStore';
 import { useSettingsStore } from '@/store/settingStore';
 import { Switch } from '@/components/ui/switch';
 import axios from 'axios';
+import { toast } from 'sonner';
 
 export default function SettingsPanel() {
   const { 
@@ -14,9 +15,43 @@ export default function SettingsPanel() {
   } = useUserStore();
   const { snapEffectEnabled, updateSetting, fetchSettings } = useSettingsStore();
 
+  const [firewallActive, setFirewallActive] = useState<boolean>(false);
+  const [isPublicNetwork, setIsPublicNetwork] = useState<boolean>(false);
+  const [networkName, setNetworkName] = useState<string>('');
+  const [firewallLoading, setFirewallLoading] = useState<boolean>(false);
+
   useEffect(() => {
     fetchSettings();
+    // Check Windows Firewall rules status
+    axios.get('/api/firewall')
+      .then(res => {
+        if (res.data?.success && res.data?.data) {
+          setFirewallActive(!!res.data.data.rulesActive);
+          setIsPublicNetwork(!!res.data.data.isPublic);
+          setNetworkName(res.data.data.networkName || '');
+        }
+      })
+      .catch(err => console.error("Failed to check firewall status:", err));
   }, [fetchSettings]);
+
+  const handleToggleFirewall = async (checked: boolean) => {
+    setFirewallLoading(true);
+    try {
+      const res = await axios.post('/api/firewall', { enable: checked });
+      if (res.data?.success) {
+        setFirewallActive(!!res.data.data?.rulesActive);
+        toast.success(checked ? "LAN Access firewall rules created" : "LAN Access firewall rules removed");
+      } else {
+        toast.error(res.data?.error || "Failed to configure firewall");
+      }
+    } catch (err: any) {
+      console.error("Firewall update error:", err);
+      const errMsg = err.response?.data?.error || err.message || "Permission denied or failed to configure firewall";
+      toast.error(errMsg);
+    } finally {
+      setFirewallLoading(false);
+    }
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -93,6 +128,32 @@ export default function SettingsPanel() {
               onCheckedChange={(checked) => updateSetting('snapEffectEnabled', checked)}
               id="snap-effect-mode"
             />
+          </div>
+
+          <div className="py-4 border-t border-[var(--color-outline-variant)]/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[var(--color-primary)] font-medium text-sm">Allow LAN Access</p>
+                <p className="text-[var(--color-on-surface-variant)] text-xs mt-1">
+                  Configure Windows Firewall rules (port 3000 &amp; 41234 on Private profile) for local subnet devices.
+                </p>
+              </div>
+              <Switch
+                checked={firewallActive}
+                disabled={firewallLoading}
+                onCheckedChange={handleToggleFirewall}
+                id="firewall-mode"
+              />
+            </div>
+
+            {isPublicNetwork && (
+              <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-start gap-2.5">
+                <span className="material-symbols-outlined text-amber-500 text-[18px] shrink-0 mt-0.5">warning</span>
+                <p className="text-[var(--color-on-surface-variant)] text-xs leading-relaxed">
+                  Your current Wi-Fi network {networkName ? `("${networkName}")` : ""} is set to <strong>Public</strong> in Windows. For LAN access to work, set this network profile to <strong>Private</strong> in Windows Settings &gt; Network &amp; internet &gt; Wi-Fi.
+                </p>
+              </div>
+            )}
           </div>
         </section>
       </div>

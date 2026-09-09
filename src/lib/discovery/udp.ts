@@ -1,5 +1,6 @@
 import dgram from "dgram";
 import { getIO } from "@/lib/socket";
+import { getActiveLocalIP } from "./network";
 
 let udpServer: dgram.Socket | null = null;
 
@@ -21,6 +22,26 @@ export function initUDP() {
       console.log(
         `> UDP Discovery ping received from ${rinfo.address}:${rinfo.port}`,
       );
+
+      // Send discovery offer back to Android client over UDP
+      const { ip: localIP } = getActiveLocalIP();
+      const serverPort = parseInt(process.env.PORT || "3000", 10);
+      const replyPayload = JSON.stringify({
+        type: "Simplify_SYNC_OFFER",
+        deviceName: "PC Host",
+        deviceId: "pc-host",
+        ip: localIP,
+        port: serverPort,
+      });
+
+      server.send(replyPayload, rinfo.port, rinfo.address, (sendErr) => {
+        if (sendErr) {
+          console.error(`> Error sending UDP offer to ${rinfo.address}:${rinfo.port}:`, sendErr);
+        } else {
+          console.log(`> UDP offer sent to ${rinfo.address}:${rinfo.port} -> ${replyPayload}`);
+        }
+      });
+
       try {
         const io = getIO();
         io?.emit("device_discovered", { ip: rinfo.address, port: rinfo.port });

@@ -10,11 +10,21 @@ import { fetchOpenGraph } from "@/lib/utils/openGraph";
 let io: Server;
 
 // Track active mobile connections to provide presence status
-const activeMobileSockets = new Map<string, number>();
+const activeMobileSockets = new Map<string, Set<string>>();
 const deviceChatState = new Map<string, boolean>();
 
 export function isDeviceOnline(deviceId: string): boolean {
-  return (activeMobileSockets.get(deviceId) || 0) > 0;
+  const sockets = activeMobileSockets.get(deviceId);
+  if (!sockets || sockets.size === 0) return false;
+  if (io) {
+    for (const sid of sockets) {
+      if (io.sockets.sockets.get(sid)?.connected) {
+        return true;
+      }
+    }
+    return false;
+  }
+  return sockets.size > 0;
 }
 
 export function initSocket(server: HTTPServer) {
@@ -29,6 +39,8 @@ export function initSocket(server: HTTPServer) {
       origin: process.env.SOCKET_CORS_ORIGIN || "http://localhost:3000",
       methods: ["GET", "POST"],
     },
+    pingInterval: 3000,
+    pingTimeout: 4000,
   });
   
   // Attach to global so API routes in dev mode (which run in isolated contexts) can access it
@@ -83,14 +95,20 @@ export function initSocket(server: HTTPServer) {
       const now = new Date().toISOString();
       updateDeviceLastActive(devId, now);
 
-      const count = activeMobileSockets.get(devId) || 0;
-      activeMobileSockets.set(devId, count + 1);
-      if (count === 0) {
+      let sockets = activeMobileSockets.get(devId);
+      if (!sockets) {
+        sockets = new Set<string>();
+        activeMobileSockets.set(devId, sockets);
+      }
+      const wasOnline = sockets.size > 0;
+      sockets.add(socket.id);
+
+      if (!wasOnline) {
         const isChatOpen = deviceChatState.get(devId) || false;
         if (process.env.NODE_ENV === "development") console.log(`[Presence] Broadcasting online:true for device ${devId}`);
         io.emit(SocketEvents.DEVICE_PRESENCE, { device_id: devId, online: true, is_chat_open: isChatOpen, last_active: now });
       }
-      if (process.env.NODE_ENV === "development") console.log(`[Socket.io] ${socket.id} auto-joined room: ${devId} | Active connections: ${count + 1}`);
+      if (process.env.NODE_ENV === "development") console.log(`[Socket.io] ${socket.id} auto-joined room: ${devId} | Active connections: ${sockets.size}`);
     }
     
     socket.on(SocketEvents.CHAT_STATE, (data: { is_open: boolean }) => {
@@ -122,8 +140,8 @@ export function initSocket(server: HTTPServer) {
       if (process.env.NODE_ENV === "development") console.log(`[Socket.io] ${socket.id} registered for device: ${device_id} | All rooms: ${JSON.stringify(rooms)}`);
       
       // Instantly reply with current presence status
-      const isOnline = (activeMobileSockets.get(device_id) || 0) > 0;
-      const isChatOpen = deviceChatState.get(device_id) || false;
+      const isOnline = isDeviceOnline(device_id);
+      const isChatOpen = isOnline ? (deviceChatState.get(device_id) || false) : false;
       if (process.env.NODE_ENV === "development") console.log(`[Presence] Register request for ${device_id}. Responding with online:${isOnline}, is_chat_open:${isChatOpen}`);
       socket.emit(SocketEvents.DEVICE_PRESENCE, { device_id, online: isOnline, is_chat_open: isChatOpen });
     });
@@ -192,23 +210,37 @@ export function initSocket(server: HTTPServer) {
       socket.to(actualDeviceId).emit(SocketEvents.RECEIVE_MESSAGE, savedMessage);
     });
 
-    socket.on("disconnect", () => {
-      if (process.env.NODE_ENV === "development") console.log(`[Socket.io] Client disconnected: ${socket.id}`);
+    socket.on("disconnect", (reason) => {
+      if (process.env.NODE_ENV === "development") console.log(`[Socket.io] Client disconnected: ${socket.id} (reason: ${reason})`);
       
       if (socket.data.device_id) {
         const devId = socket.data.device_id;
-        const count = activeMobileSockets.get(devId) || 1;
+        const sockets = activeMobileSockets.get(devId);
+        if (sockets) {
+          sockets.delete(socket.id);
+        }
         const now = new Date().toISOString();
         updateDeviceLastActive(devId, now);
 
-        if (count <= 1) {
+        let hasActiveSocket = false;
+        if (sockets && sockets.size > 0) {
+          for (const sid of Array.from(sockets)) {
+            const s = io.sockets.sockets.get(sid);
+            if (s && s.connected) {
+              hasActiveSocket = true;
+              break;
+            } else {
+              sockets.delete(sid);
+            }
+          }
+        }
+
+        if (!hasActiveSocket) {
           activeMobileSockets.delete(devId);
           deviceChatState.set(devId, false); // Reset chat state on disconnect
           if (process.env.NODE_ENV === "development") console.log(`[Presence] Broadcasting online:false for device ${devId}`);
           io.emit(SocketEvents.DEVICE_PRESENCE, { device_id: devId, online: false, is_chat_open: false, last_active: now });
           if (process.env.NODE_ENV === "development") console.log(`[Socket.io] Device ${devId} is now offline.`);
-        } else {
-          activeMobileSockets.set(devId, count - 1);
         }
       }
     });
