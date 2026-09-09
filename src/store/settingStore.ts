@@ -4,6 +4,7 @@ import axios from 'axios';
 interface SettingsState {
   clipboardSyncEnabled: boolean;
   folderMirrorEnabled: boolean; // Pre-emptively added for Phase 7
+  snapEffectEnabled: boolean;
   fetchSettings: () => Promise<void>;
   updateSetting: (key: string, value: boolean) => Promise<void>;
 }
@@ -11,16 +12,21 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>((set) => ({
   clipboardSyncEnabled: false,
   folderMirrorEnabled: false,
+  snapEffectEnabled: true,
 
   fetchSettings: async () => {
     try {
       const res = await axios.get('/api/setting');
       if (res.data.success) {
-          // SQLite stores booleans as 1/0 or strings depending on implementation, handle coercions
+        // SQLite stores booleans as 1/0 or strings depending on implementation, handle coercions
         const ResponseFolderMirrorState = res.data.data.folderMirrorEnabled;
+        const ResponseSnapEffectState = res.data.data.snapEffectEnabled;
         
         set({
           folderMirrorEnabled: ResponseFolderMirrorState === 'true' || ResponseFolderMirrorState === 1 || ResponseFolderMirrorState === true,
+          snapEffectEnabled: ResponseSnapEffectState === undefined || ResponseSnapEffectState === null
+            ? true
+            : (ResponseSnapEffectState === 'true' || ResponseSnapEffectState === 1 || ResponseSnapEffectState === true),
         });
       }
     } catch (error) {

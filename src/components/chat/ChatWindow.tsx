@@ -1,5 +1,7 @@
 import { useChatStore } from "@/store/chatStore";
 import { useUserStore } from "@/store/userStore";
+import { useSettingsStore } from "@/store/settingStore";
+import { thanosSnap } from "@/lib/effects/thanosSnap";
 import axios from "axios";
 // import { useSocket } from "@/lib/socket/SocketProvider";
 import React, { useEffect, useRef, useState } from "react";
@@ -182,6 +184,7 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
   const [clearChatSync, setClearChatSync] = useState(false);
 
   const { deleteMessages } = useChatStore();
+  const { snapEffectEnabled } = useSettingsStore();
 
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -195,6 +198,15 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
 
   // Ref to track when an internal chat image/file is being dragged outward
   const isDraggingInternalRef = useRef(false);
+
+  // Maintain scroll position when new messages arrive or when sending
+  const isScrolledToBottomRef = useRef(true);
+
+  // Pagination states
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const limit = 50;
 
   // Helper: check if user is within 150px of the bottom
   const isNearBottom = () => {
@@ -215,12 +227,6 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
     }
   };
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Pagination states
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const limit = 50;
 
   const toggleSelection = (id: number) => {
     setSelectedIds((prev) => {
@@ -244,20 +250,42 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
     }
   };
 
-  const deleteSelected = () => {
+  const deleteSelected = async () => {
     if (selectedIds.size > 0) {
-      // Sync is false for individual selects, as per instructions. Wait, user wants a dialog or what?
-      // "first option is select when presed i can select messages in proper way adn delete, and coply all option appers in header bar hide all of things"
-      // User didn't specify sync for select, only for clear chat. So I'll just delete them.
-      deleteMessages(Array.from(selectedIds), false);
+      const idsToDelete = Array.from(selectedIds);
+
+      if (snapEffectEnabled) {
+        const elementsToSnap: HTMLElement[] = [];
+        idsToDelete.forEach((id) => {
+          const el = document.querySelector(`[data-msg-id="${id}"]`) as HTMLElement | null;
+          if (el) elementsToSnap.push(el);
+        });
+
+        if (elementsToSnap.length > 0) {
+          await Promise.all(elementsToSnap.map((el) => thanosSnap(el)));
+        }
+      }
+
+      deleteMessages(idsToDelete, false);
       cancelSelection();
     }
   };
 
-  const clearChat = () => {
-    deleteMessages('all', clearChatSync);
+  const clearChat = async () => {
     setShowClearChatModal(false);
     closeMenu(true);
+
+    if (snapEffectEnabled) {
+      const allBubbles = Array.from(
+        document.querySelectorAll('[data-chat-bubble="true"]')
+      ) as HTMLElement[];
+
+      if (allBubbles.length > 0) {
+        await Promise.all(allBubbles.map((el) => thanosSnap(el)));
+      }
+    }
+
+    deleteMessages('all', clearChatSync);
   };
 
   useEffect(() => {
@@ -810,6 +838,8 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
 
               {/* Message Bubble */}
               <div
+                data-msg-id={msg.id}
+                data-chat-bubble="true"
                 className={`flex flex-col ${isImg ? "max-w-[260px] sm:max-w-[300px]" : "max-w-[85%] md:max-w-[70%]"} gap-1 group relative ${isMe ? "self-end items-end" : "self-start"} ${isSelectionMode ? "cursor-pointer" : ""} ${animationClass}`}
                 onClick={() => {
                   if (isSelectionMode && msg.id) {

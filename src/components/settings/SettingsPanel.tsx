@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useUserStore } from '@/store/userStore';
+import { useSettingsStore } from '@/store/settingStore';
 import { Switch } from '@/components/ui/switch';
 import axios from 'axios';
 
@@ -11,6 +12,11 @@ export default function SettingsPanel() {
     theme, setTheme, 
     enableDoubleClickCopy,setEnableDoubleClickCopy 
   } = useUserStore();
+  const { snapEffectEnabled, updateSetting, fetchSettings } = useSettingsStore();
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -74,6 +80,18 @@ export default function SettingsPanel() {
               checked={enableDoubleClickCopy}
               onCheckedChange={(checked) => setEnableDoubleClickCopy(checked)}
               id="double-click-mode"
+            />
+          </div>
+
+          <div className="flex items-center justify-between py-4 border-t border-[var(--color-outline-variant)]/20">
+            <div>
+              <p className="text-[var(--color-primary)] font-medium text-sm">Snap effect on delete/clear</p>
+              <p className="text-[var(--color-on-surface-variant)] text-xs mt-1">Disintegrate messages into dust when deleted or cleared.</p>
+            </div>
+            <Switch
+              checked={snapEffectEnabled}
+              onCheckedChange={(checked) => updateSetting('snapEffectEnabled', checked)}
+              id="snap-effect-mode"
             />
           </div>
         </section>
