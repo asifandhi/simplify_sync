@@ -74,8 +74,26 @@ export function connectDB() {
   }
 }
 
-export function getChatByDeviceId(device_id: string, limit: number = 50, offset: number = 0) {
+export function getChatByDeviceId(device_id: string, limit: number = 50, offset: number = 0, beforeTimestamp?: string, beforeId?: number) {
   try {
+    if (beforeTimestamp && beforeId !== undefined) {
+      const stmt = db.prepare(
+        `SELECT * FROM chat_history 
+         WHERE device_id = ? AND (timestamp < ? OR (timestamp = ? AND id < ?))
+         ORDER BY timestamp DESC, id DESC LIMIT ?`
+      );
+      const rows = stmt.all(device_id, beforeTimestamp, beforeTimestamp, beforeId, limit);
+      return rows as any[];
+    }
+    if (beforeId !== undefined) {
+      const stmt = db.prepare(
+        `SELECT * FROM chat_history 
+         WHERE device_id = ? AND id < ?
+         ORDER BY timestamp DESC, id DESC LIMIT ?`
+      );
+      const rows = stmt.all(device_id, beforeId, limit);
+      return rows as any[];
+    }
     const stmt = db.prepare(
       `SELECT * FROM chat_history WHERE device_id = ? ORDER BY timestamp DESC, id DESC LIMIT ? OFFSET ?`,
     );
@@ -139,32 +157,30 @@ interface chatMessageInput {
 }
 
 export function insertChatMessage(data: chatMessageInput) {
-  try {
-    if (data.file_path && !isValidUploadFilename(data.file_path)) {
-      data.file_path = undefined;
-    }
-    const stmt = db.prepare(
-      `INSERT INTO chat_history (device_id, sender, content_type, content, file_path, preview_data, is_view_once, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    );
-    const result = stmt.run(
-      data.device_id,
-      data.sender,
-      data.content_type,
-      data.content || null,
-      data.file_path || null,
-      data.preview_data || null,
-      data.is_view_once ? 1 : 0,
-      data.status || 'SENT',
-    );
-    if (process.env.NODE_ENV === "development") {
-      console.log("Inserted chat message with ID:", result.lastInsertRowid);
-      console.log("This is the result ");
-      console.table(result);
-    }
-      return db.prepare('SELECT * FROM chat_history WHERE id = ?').get(result.lastInsertRowid) as any;
-  } catch (error) {
-    console.error("Error inserting chat message:", error);
+  if (data.file_path && !isValidUploadFilename(data.file_path)) {
+    data.file_path = undefined;
   }
+  const stmt = db.prepare(
+    `INSERT INTO chat_history (device_id, sender, content_type, content, file_path, preview_data, is_view_once, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  const result = stmt.run(
+    data.device_id,
+    data.sender,
+    data.content_type,
+    data.content || null,
+    data.file_path || null,
+    data.preview_data || null,
+    data.is_view_once ? 1 : 0,
+    data.status || 'SENT',
+  );
+  if (process.env.NODE_ENV === "development") {
+    console.log("Inserted chat message with ID:", result.lastInsertRowid);
+  }
+  const row = db.prepare('SELECT * FROM chat_history WHERE id = ?').get(result.lastInsertRowid);
+  if (!row) {
+    throw new Error("Failed to retrieve inserted chat message");
+  }
+  return row as any;
 }
 
 export function updateChatMessageStatus(id: number, is_viewed: boolean,device_id: string) {
@@ -184,7 +200,7 @@ export function updateChatMessageStatus(id: number, is_viewed: boolean,device_id
   }
 }
 
-export function deleteChatMessage(id: number, device_id: string) {
+export function deleteChatMessage(id: number, device_id: string): boolean {
   try {
     const stmt = db.prepare(
       `DELETE FROM chat_history WHERE id = ? AND device_id = ?`,
@@ -194,15 +210,16 @@ export function deleteChatMessage(id: number, device_id: string) {
       console.log(`Deleted chat message with ID: ${id}`);
       console.table(result);
     }
-    return result.changes > 0;
+    return result.changes >= 0;
   } catch (error) {
     console.error("Error deleting chat message:", error);
     return false;
   }
 }
 
-export function deleteMultipleChatMessages(ids: number[], device_id: string) {
+export function deleteMultipleChatMessages(ids: number[], device_id: string): boolean {
   try {
+    if (!ids || ids.length === 0) return true;
     const placeholders = ids.map(() => '?').join(',');
     const stmt = db.prepare(
       `DELETE FROM chat_history WHERE id IN (${placeholders}) AND device_id = ?`,
@@ -212,14 +229,14 @@ export function deleteMultipleChatMessages(ids: number[], device_id: string) {
       console.log(`Deleted chat messages with IDs: ${ids.join(', ')}`);
       console.table(result);
     }
-    return result.changes > 0;
+    return result.changes >= 0;
   } catch (error) {
     console.error("Error deleting multiple chat messages:", error);
     return false;
   }
 }
 
-export function deleteAllChatMessages(device_id: string) {
+export function deleteAllChatMessages(device_id: string): boolean {
   try {
     const stmt = db.prepare(
       `DELETE FROM chat_history WHERE device_id = ?`,
@@ -228,7 +245,7 @@ export function deleteAllChatMessages(device_id: string) {
     if (process.env.NODE_ENV === "development") {
       console.log(`Deleted all chat messages for device: ${device_id}`);
     }
-    return result.changes > 0;
+    return result.changes >= 0;
   } catch (error) {
     console.error("Error deleting all chat messages:", error);
     return false;
@@ -370,6 +387,11 @@ export function markActionApplied(action_id: number, device_id: string): { chang
   }
   const stmt = db.prepare(`UPDATE pending_actions SET applied = 1 WHERE id = ? AND device_id = ? AND applied = 0`);
   return stmt.run(action_id, device_id);
+}
+
+export function clearPendingActionsForDevice(device_id: string): void {
+  ensurePendingActionsTable();
+  db.prepare(`DELETE FROM pending_actions WHERE device_id = ?`).run(device_id);
 }
 
 export function isDeviceRegistered(deviceId: string): boolean {

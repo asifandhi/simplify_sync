@@ -1,8 +1,10 @@
-import { getChatByDeviceId, getPendingChatMessages, insertChatMessage, deleteMultipleChatMessages, deleteAllChatMessages } from "@/db/sqlite";
+import { getChatByDeviceId, getPendingChatMessages, insertChatMessage, deleteMultipleChatMessages, deleteAllChatMessages, insertPendingAction } from "@/db/sqlite";
 import { ApiResponse } from "@/lib/utils/ApiResponse";
 import { isValidUploadFilename } from "@/lib/pathSafety";
 import { asyncHandler } from "@/lib/utils/asyncHandler";
 import { fetchOpenGraph } from "@/lib/utils/openGraph";
+import { getIO, isDeviceOnline, isDeviceChatOpen } from "@/lib/socket";
+import { SocketEvents } from "@/lib/socket/events";
 
 export const GET = asyncHandler(async (request: Request) => {
   const { searchParams } = new URL(request.url);
@@ -28,8 +30,11 @@ export const GET = asyncHandler(async (request: Request) => {
 
   const limit = parseInt(searchParams.get("limit") || "50", 10);
   const offset = parseInt(searchParams.get("offset") || "0", 10);
+  const beforeTimestamp = searchParams.get("before_timestamp") || undefined;
+  const beforeIdStr = searchParams.get("before_id");
+  const beforeId = beforeIdStr ? parseInt(beforeIdStr, 10) : undefined;
   
-  const chatHistory = getChatByDeviceId(device_id, limit, offset) || [];
+  const chatHistory = getChatByDeviceId(device_id, limit, offset, beforeTimestamp, beforeId) || [];
   return ApiResponse.success({ messages: chatHistory.reverse() });
 });
 
@@ -61,15 +66,20 @@ export const POST = asyncHandler(async (request: Request) => {
     }
   }
 
-  const savedMessage = insertChatMessage({
-    device_id: device_id,
-    sender: "me",
-    content_type: data.content_type || "text",
-    content: data.content,
-    file_path: data.file_path,
-    preview_data: finalPreviewData,
-    is_view_once: data.is_view_once,
-  });
+  let savedMessage;
+  try {
+    savedMessage = insertChatMessage({
+      device_id: device_id,
+      sender: "me",
+      content_type: data.content_type || "text",
+      content: data.content,
+      file_path: data.file_path,
+      preview_data: finalPreviewData,
+      is_view_once: data.is_view_once,
+    });
+  } catch (err) {
+    return ApiResponse.error("Failed to insert chat message into database", 500);
+  }
 
   // ponytail: broadcast removed — messages are now sent exclusively through socket
   // send_message handler which does persist + broadcast (single emit path)
@@ -90,15 +100,38 @@ export const DELETE = asyncHandler(async (request: Request) => {
   }
 
   const { message_ids } = data;
+  const syncToDevice = data.sync_to_device !== undefined
+    ? Boolean(data.sync_to_device)
+    : (data.syncToDevice !== undefined ? Boolean(data.syncToDevice) : true);
 
+  let deleteSuccess = false;
   if (message_ids === "all") {
-    deleteAllChatMessages(device_id);
+    deleteSuccess = deleteAllChatMessages(device_id);
   } else if (Array.isArray(message_ids) && message_ids.length > 0) {
-    deleteMultipleChatMessages(message_ids, device_id);
+    deleteSuccess = deleteMultipleChatMessages(message_ids, device_id);
+  } else {
+    return ApiResponse.error("Invalid message_ids", 400);
   }
 
-  // ponytail: broadcast removed — deletes are now handled exclusively through
-  // socket delete_messages handler which does DB + broadcast (single emit path)
+  if (!deleteSuccess) {
+    return ApiResponse.error("Failed to delete messages from database", 500);
+  }
+
+  // W14: Only broadcast/queue to Android if syncToDevice is true
+  if (syncToDevice) {
+    const io = getIO();
+    const isOnline = isDeviceOnline(device_id);
+    const isChatOpen = isDeviceChatOpen(device_id);
+    if (io && isOnline && isChatOpen) {
+      io.to(device_id).emit(SocketEvents.DELETE_MESSAGES, {
+        device_id,
+        message_ids,
+      });
+    } else {
+      const payloadStr = message_ids === "all" ? "all" : JSON.stringify(message_ids);
+      insertPendingAction(device_id, "clear_chat", payloadStr);
+    }
+  }
 
   return ApiResponse.success({ deleted: true });
 });

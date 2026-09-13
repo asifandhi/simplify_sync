@@ -18,9 +18,9 @@ export interface ChatMessage {
 
 export interface PendingMessage {
   localId: string;
-  payload: Omit<ChatMessage, 'id' | 'timestamp'>;
+  payload: Omit<ChatMessage, 'id' | 'timestamp'> & { client_id?: string };
   retries: number;
-  status: 'pending' | 'failed';
+  status: 'pending' | 'sending' | 'failed';
 }
 
 const MAX_RETRIES = 3;
@@ -36,11 +36,11 @@ interface ChatStore {
   initSocket: () => void;
   connectSocket: (deviceId: string) => void;
   disconnectSocket: () => void;
-  setMessages: (messages: ChatMessage[]) => void;
+  setMessages: (messages: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
   sendMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
-  flushQueue: () => void;
+  flushQueue: (targetDeviceId?: string) => void;
   retryMessage: (localId: string) => void;
-  deleteMessages: (messageIds: number[] | 'all', syncToDevice: boolean) => Promise<void>;
+  deleteMessages: (messageIds: number[] | 'all', syncToDevice: boolean, targetDeviceId?: string) => Promise<void>;
 }
 
 export const useChatStore = create<ChatStore>()(
@@ -114,7 +114,10 @@ export const useChatStore = create<ChatStore>()(
                   toast.success("Device connected");
                 });
               }
-              set({ isDeviceOnline: data.online, isChatOpen: !!data.is_chat_open });
+              set((state) => ({
+                isDeviceOnline: data.online,
+                isChatOpen: data.is_chat_open !== undefined ? Boolean(data.is_chat_open) : (data.online ? state.isChatOpen : false),
+              }));
             }
           });
 
@@ -164,18 +167,29 @@ export const useChatStore = create<ChatStore>()(
 
           socket.on('chat_sync_ready', async (data: { device_id: string }) => {
             console.log('[ChatStore] chat_sync_ready event received:', data);
-            const activeId = get().activeDeviceId || data?.device_id;
-            if (activeId && (!data?.device_id || String(data.device_id) === String(activeId))) {
-              try {
-                const res = await fetch(`/api/chat?device_id=${activeId}&limit=50&offset=0`);
-                const json = await res.json();
-                if (json.success && json.data?.messages) {
-                  console.log('[ChatStore] chat_sync_ready synced messages count:', json.data.messages.length);
-                  set({ messages: json.data.messages });
-                }
-              } catch (err) {
-                console.error("[ChatStore] Failed to sync chat", err);
+            const targetId = data?.device_id;
+            if (!targetId) return;
+            try {
+              const res = await fetch(`/api/chat?device_id=${targetId}&limit=50&offset=0`);
+              const json = await res.json();
+              if (json.success && Array.isArray(json.data?.messages)) {
+                const fetchedMsgs: ChatMessage[] = json.data.messages;
+                set((state) => {
+                  // W16: Only apply if the target device is STILL the active device
+                  if (state.activeDeviceId !== targetId) return state;
+                  const existingIds = new Set(state.messages.map((m) => m.id).filter(Boolean));
+                  const newMessages = fetchedMsgs.filter((m) => !existingIds.has(m.id));
+                  if (newMessages.length === 0) return state;
+                  const merged = [...state.messages, ...newMessages].sort((a, b) => {
+                    const timeA = a.timestamp ? new Date(a.timestamp).getTime() : (a.id || 0);
+                    const timeB = b.timestamp ? new Date(b.timestamp).getTime() : (b.id || 0);
+                    return timeA - timeB;
+                  });
+                  return { messages: merged };
+                });
               }
+            } catch (err) {
+              console.error("[ChatStore] Failed to sync chat", err);
             }
           });
 
@@ -219,7 +233,14 @@ export const useChatStore = create<ChatStore>()(
         console.log('[ChatStore] connectSocket called for device:', deviceId, 'socket connected:', socket?.connected);
 
         // Socket.IO buffers emits if not yet connected, so emit register directly
-        socket?.emit('register', deviceId);
+        socket?.emit('register', deviceId, (ack?: { success: boolean }) => {
+          if (ack?.success) {
+            get().flushQueue(deviceId);
+          }
+        });
+        if (socket?.connected) {
+          get().flushQueue(deviceId);
+        }
       },
 
       disconnectSocket: () => {
@@ -230,15 +251,19 @@ export const useChatStore = create<ChatStore>()(
         set({ socket: null, activeDeviceId: null, messages: [], isDeviceOnline: false, isChatOpen: false });
       },
 
-      setMessages: (messages) => set({ messages }),
+      setMessages: (messages) => set((state) => ({
+        messages: typeof messages === 'function' ? messages(state.messages) : messages,
+      })),
 
       sendMessage: (message) => {
         const socket = get().socket;
+        const localId = `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const payloadWithClient = { ...message, client_id: localId };
+
         if (!socket?.connected) {
           console.warn('[ChatStore] Socket not connected — queuing message');
-          const localId = `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`;
           set((state) => ({
-            pendingQueue: [...state.pendingQueue, { localId, payload: message, retries: 0, status: 'pending' }],
+            pendingQueue: [...state.pendingQueue, { localId, payload: payloadWithClient, retries: 0, status: 'pending' }],
           }));
           return;
         }
@@ -246,12 +271,12 @@ export const useChatStore = create<ChatStore>()(
         // Single emit path: send via socket, server persists + broadcasts to others.
         // The ack callback returns the saved message (with DB id + timestamp).
         console.log(`[TRACE: WEB EMIT] send_message to server for device: ${message.device_id} | content: ${message.content?.substring(0, 20)}...`);
-        socket.emit('send_message', message, (savedMessage: ChatMessage | { error: string }) => {
-          if ('error' in savedMessage) {
-            console.error('[ChatStore] send_message rejected by server:', savedMessage.error);
-            const localId = `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        socket.emit('send_message', payloadWithClient, (savedMessage: any) => {
+          if (!savedMessage || typeof savedMessage !== 'object' || 'error' in savedMessage || !savedMessage.id) {
+            const errStr = savedMessage?.error || 'Server error';
+            console.error('[ChatStore] send_message rejected by server:', errStr);
             set((state) => ({
-              pendingQueue: [...state.pendingQueue, { localId, payload: message, retries: 0, status: 'pending' }],
+              pendingQueue: [...state.pendingQueue, { localId, payload: payloadWithClient, retries: 0, status: 'pending' }],
             }));
             return;
           }
@@ -265,20 +290,33 @@ export const useChatStore = create<ChatStore>()(
         });
       },
 
-      flushQueue: () => {
+      flushQueue: (targetDeviceId?: string) => {
         const { pendingQueue, activeDeviceId, socket } = get();
         if (pendingQueue.length === 0 || !socket?.connected) return;
 
+        const devId = targetDeviceId || activeDeviceId;
+        if (!devId) return;
+
+        // W18: Filter only pending (not in-flight/sending or failed) messages for this device
         const toFlush = pendingQueue.filter(
-          (p) => p.payload.device_id === activeDeviceId && p.status !== 'failed'
+          (p) => p.payload.device_id === devId && p.status === 'pending'
         );
         if (toFlush.length === 0) return;
 
-        console.log(`[ChatStore] Flushing ${toFlush.length} queued message(s)...`);
+        console.log(`[ChatStore] Flushing ${toFlush.length} queued message(s) for device: ${devId}...`);
+
+        // Mark in-flight immediately to prevent concurrent duplicate sends
+        set((state) => ({
+          pendingQueue: state.pendingQueue.map((p) =>
+            toFlush.some((tf) => tf.localId === p.localId)
+              ? { ...p, status: 'sending' as const }
+              : p
+          ),
+        }));
 
         for (const pending of toFlush) {
-          socket.emit('send_message', pending.payload, (savedMessage: ChatMessage | { error: string }) => {
-            if (savedMessage && 'error' in savedMessage) {
+          socket.emit('send_message', pending.payload, (savedMessage: any) => {
+            if (!savedMessage || typeof savedMessage !== 'object' || 'error' in savedMessage || !savedMessage.id) {
               const newRetries = pending.retries + 1;
               set((state) => ({
                 pendingQueue: state.pendingQueue.map((p) =>
@@ -289,12 +327,17 @@ export const useChatStore = create<ChatStore>()(
               }));
               return;
             }
-            set((state) => ({
-              pendingQueue: state.pendingQueue.filter((p) => p.localId !== pending.localId),
-              messages: state.messages.some((m) => m.id === savedMessage.id)
-                ? state.messages
-                : [...state.messages, savedMessage],
-            }));
+            set((state) => {
+              const remainingQueue = state.pendingQueue.filter((p) => p.localId !== pending.localId);
+              if (state.activeDeviceId === devId) {
+                const exists = state.messages.some((m) => m.id === savedMessage.id);
+                return {
+                  pendingQueue: remainingQueue,
+                  messages: exists ? state.messages : [...state.messages, savedMessage],
+                };
+              }
+              return { pendingQueue: remainingQueue };
+            });
           });
         }
       },
@@ -308,25 +351,31 @@ export const useChatStore = create<ChatStore>()(
         get().flushQueue();
       },
 
-      deleteMessages: async (messageIds: number[] | 'all', syncToDevice: boolean) => {
-        const { activeDeviceId, socket } = get();
-        if (!activeDeviceId) return;
+      deleteMessages: async (messageIds: number[] | 'all', syncToDevice: boolean, targetDeviceId?: string) => {
+        const targetId = targetDeviceId || get().activeDeviceId;
+        if (!targetId) return;
+        const socket = get().socket;
         
         // Single emit path: socket handler does DB deletion + broadcasts to other clients
-        if (socket?.connected) {
+        if (socket?.connected && get().activeDeviceId === targetId) {
           socket.emit('delete_messages', {
-            device_id: activeDeviceId,
+            device_id: targetId,
             message_ids: messageIds,
+            sync_to_device: syncToDevice,
           });
         } else {
           // Fallback: if socket is down, delete via HTTP so data stays consistent
           try {
-            await fetch('/api/chat', {
+            const endpoint = typeof window !== 'undefined'
+              ? '/api/chat'
+              : `${process.env.TEST_BASE_URL || `http://127.0.0.1:${process.env.PORT || 3000}`}/api/chat`;
+            await fetch(endpoint, {
               method: 'DELETE',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                device_id: activeDeviceId,
+                device_id: targetId,
                 message_ids: messageIds,
+                sync_to_device: syncToDevice,
               }),
             });
           } catch (err) {
@@ -334,13 +383,15 @@ export const useChatStore = create<ChatStore>()(
           }
         }
 
-        // Optimistically update local state
-        if (messageIds === 'all') {
-          set({ messages: [] });
-        } else if (Array.isArray(messageIds)) {
-          set(state => ({
-            messages: state.messages.filter(m => m.id === undefined || !messageIds.includes(m.id))
-          }));
+        // W15: Optimistically update local state ONLY if targetId is still active
+        if (get().activeDeviceId === targetId) {
+          if (messageIds === 'all') {
+            set({ messages: [] });
+          } else if (Array.isArray(messageIds)) {
+            set((state) => ({
+              messages: state.messages.filter((m) => m.id === undefined || !messageIds.includes(m.id)),
+            }));
+          }
         }
       },
     }),

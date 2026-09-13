@@ -47,6 +47,10 @@ export function isDeviceOnline(deviceId: string): boolean {
   return sockets.size > 0;
 }
 
+export function isDeviceChatOpen(deviceId: string): boolean {
+  return deviceChatState.get(deviceId) === true;
+}
+
 export function disconnectDeviceSockets(deviceId: string): void {
   if (!deviceId || typeof deviceId !== "string") return;
 
@@ -229,17 +233,23 @@ export function initSocket(server: HTTPServer) {
       }
     });
 
-    socket.on(SocketEvents.REGISTER, (device_id: unknown) => {
+    socket.on(SocketEvents.REGISTER, (device_id: unknown, ack?: unknown) => {
       try {
         // W02: Only web clients can register for device rooms
         if (socket.data.role !== 'web') {
           if (process.env.NODE_ENV === "development") {
             console.warn(`[Socket.io] Ignoring REGISTER from non-web client ${socket.id} (role: ${socket.data.role})`);
           }
+          if (typeof ack === "function") {
+            try { ack({ success: false, error: "Only web clients can register" }); } catch {}
+          }
           return;
         }
 
         if (!isValidSocketDeviceId(device_id)) {
+          if (typeof ack === "function") {
+            try { ack({ success: false, error: "Invalid device_id" }); } catch {}
+          }
           return;
         }
 
@@ -261,6 +271,11 @@ export function initSocket(server: HTTPServer) {
         const isChatOpen = isOnline ? (deviceChatState.get(validDeviceId) || false) : false;
         if (process.env.NODE_ENV === "development") console.log(`[Presence] Register request for ${validDeviceId}. Responding with online:${isOnline}, is_chat_open:${isChatOpen}`);
         socket.emit(SocketEvents.DEVICE_PRESENCE, { device_id: validDeviceId, online: isOnline, is_chat_open: isChatOpen });
+
+        // W18: Acknowledge registration to client
+        if (typeof ack === "function") {
+          try { ack({ success: true, device_id: validDeviceId, is_online: isOnline, is_chat_open: isChatOpen }); } catch {}
+        }
       } catch (err) {
         if (process.env.NODE_ENV === "development") console.error("[Socket.io] Error in register handler:", err);
       }
@@ -320,7 +335,17 @@ export function initSocket(server: HTTPServer) {
         // Update last active timestamp on every sent message
         const now = new Date().toISOString();
         updateDeviceLastActive(actualDeviceId, now);
-        io.emit(SocketEvents.DEVICE_PRESENCE, { device_id: actualDeviceId, online: true, last_active: now });
+        // W17: Derive presence strictly from authenticated mobile socket membership
+        if (socket.data.role === "mobile") {
+          const isOnline = isDeviceOnline(actualDeviceId);
+          const isChatOpen = isOnline ? (deviceChatState.get(actualDeviceId) || false) : false;
+          io.emit(SocketEvents.DEVICE_PRESENCE, {
+            device_id: actualDeviceId,
+            online: isOnline,
+            is_chat_open: isChatOpen,
+            last_active: now,
+          });
+        }
 
         // Determine sender identity
         const sender = socket.data.device_id
@@ -349,17 +374,29 @@ export function initSocket(server: HTTPServer) {
           return;
         }
 
-        // Persist message to SQLite
+        // Persist message to SQLite (W19: validate genuinely committed DB operation)
         const isViewOnce = Boolean(data.is_view_once || data.isViewOnce);
-        const savedMessage = insertChatMessage({
-          device_id: actualDeviceId,
-          sender,
-          content_type: contentType,
-          content: data.content,
-          file_path: rawFilePath,
-          preview_data: finalPreviewData,
-          is_view_once: isViewOnce,
-        });
+        let savedMessage: any;
+        try {
+          savedMessage = insertChatMessage({
+            device_id: actualDeviceId,
+            sender,
+            content_type: contentType,
+            content: data.content,
+            file_path: rawFilePath,
+            preview_data: finalPreviewData,
+            is_view_once: isViewOnce,
+          });
+        } catch (dbErr: any) {
+          if (process.env.NODE_ENV === "development") console.error("[Socket.io] DB insertion error in send_message:", dbErr);
+          sendError("Database write failed");
+          return;
+        }
+
+        if (!savedMessage || typeof savedMessage !== "object" || !savedMessage.id) {
+          sendError("Failed to persist message");
+          return;
+        }
 
         // Send saved message back to sender via acknowledgment
         if (typeof callback === "function") {
@@ -574,9 +611,12 @@ export function initSocket(server: HTTPServer) {
 
     // ── SINGLE EMIT PATH for deletes ─────────────────────────────────────
     // Both mobile and web clients send deletes through this handler.
-    socket.on(SocketEvents.DELETE_MESSAGES, (payload: unknown) => {
+    socket.on(SocketEvents.DELETE_MESSAGES, (payload: unknown, callback?: unknown) => {
       try {
         if (!isPlainObject(payload)) {
+          if (typeof callback === "function") {
+            try { callback({ success: false, error: "Invalid payload: object expected" }); } catch {}
+          }
           return;
         }
 
@@ -585,6 +625,9 @@ export function initSocket(server: HTTPServer) {
         if (!actualDeviceId || !isValidSocketDeviceId(actualDeviceId) || !isSocketAuthorizedForDevice(socket, actualDeviceId)) {
           if (process.env.NODE_ENV === "development") {
             console.warn(`[Socket.io] Rejecting delete_messages: unauthorized for device '${actualDeviceId}'`);
+          }
+          if (typeof callback === "function") {
+            try { callback({ success: false, error: "Unauthorized" }); } catch {}
           }
           return;
         }
@@ -597,31 +640,74 @@ export function initSocket(server: HTTPServer) {
             payload.message_ids.every((id: unknown) => isPositiveSafeInteger(id)));
 
         if (!isValidIds) {
+          if (typeof callback === "function") {
+            try { callback({ success: false, error: "Invalid message_ids" }); } catch {}
+          }
           return;
         }
 
-        if (process.env.NODE_ENV === "development") console.log(`[Socket] Delete messages requested by ${socket.data.role} for ${actualDeviceId}:`, payload.message_ids);
+        // W14: sync_to_device choice
+        const syncToDevice = socket.data.role === "mobile"
+          ? true
+          : (payload.sync_to_device !== undefined ? Boolean(payload.sync_to_device) : true);
 
+        if (process.env.NODE_ENV === "development") {
+          console.log(`[Socket] Delete messages requested by ${socket.data.role} for ${actualDeviceId} (syncToDevice: ${syncToDevice}):`, payload.message_ids);
+        }
+
+        let deleteSuccess = false;
         if (payload.message_ids === "all") {
-          deleteAllChatMessages(actualDeviceId);
+          deleteSuccess = deleteAllChatMessages(actualDeviceId);
         } else if (Array.isArray(payload.message_ids)) {
-          deleteMultipleChatMessages(payload.message_ids, actualDeviceId);
+          deleteSuccess = deleteMultipleChatMessages(payload.message_ids, actualDeviceId);
         }
 
-        // If the target device is currently offline or not on chat screen, queue the action so it applies on reconnect/open
-        const targetIsOnline = isDeviceOnline(actualDeviceId);
-        const isChatOpen = deviceChatState.get(actualDeviceId) === true;
-        if ((!targetIsOnline || !isChatOpen) && socket.data.role === "web") {
-          const payloadStr = payload.message_ids === "all" ? "all" : JSON.stringify(payload.message_ids);
-          insertPendingAction(actualDeviceId, "clear_chat", payloadStr);
-          if (process.env.NODE_ENV === "development") console.log(`[Socket] Device ${actualDeviceId} offline or chat closed — queued clear_chat pending action`);
+        // W19: If DB deletion failed, abort and report error without broadcasting
+        if (!deleteSuccess) {
+          if (process.env.NODE_ENV === "development") console.error(`[Socket] DB deletion failed for ${actualDeviceId}`);
+          if (typeof callback === "function") {
+            try { callback({ success: false, error: "Database deletion failed" }); } catch {}
+          }
+          return;
         }
 
-        // Broadcast to everyone else in the room — always include device_id in payload
-        socket.to(actualDeviceId).emit(SocketEvents.DELETE_MESSAGES, {
-          device_id: actualDeviceId,
-          message_ids: payload.message_ids,
-        });
+        if (typeof callback === "function") {
+          try { callback({ success: true }); } catch {}
+        }
+
+        // W14: Only broadcast/queue to Android if syncToDevice is true
+        if (syncToDevice) {
+          const targetIsOnline = isDeviceOnline(actualDeviceId);
+          const isChatOpen = deviceChatState.get(actualDeviceId) === true;
+          if ((!targetIsOnline || !isChatOpen) && socket.data.role === "web") {
+            const payloadStr = payload.message_ids === "all" ? "all" : JSON.stringify(payload.message_ids);
+            insertPendingAction(actualDeviceId, "clear_chat", payloadStr);
+            if (process.env.NODE_ENV === "development") console.log(`[Socket] Device ${actualDeviceId} offline or chat closed — queued clear_chat pending action`);
+          }
+
+          // Broadcast to everyone else in the room (including mobile sockets)
+          socket.to(actualDeviceId).emit(SocketEvents.DELETE_MESSAGES, {
+            device_id: actualDeviceId,
+            message_ids: payload.message_ids,
+          });
+        } else {
+          // If syncToDevice is false, mobile must NOT receive delete_messages!
+          // Broadcast only to other WEB sockets in this room
+          const room = io.sockets.adapter.rooms.get(actualDeviceId);
+          if (room) {
+            for (const socketId of room) {
+              if (socketId !== socket.id) {
+                const peerSocket = io.sockets.sockets.get(socketId);
+                if (peerSocket && peerSocket.data.role === "web") {
+                  peerSocket.emit(SocketEvents.DELETE_MESSAGES, {
+                    device_id: actualDeviceId,
+                    message_ids: payload.message_ids,
+                  });
+                }
+              }
+            }
+          }
+        }
       } catch (err) {
         if (process.env.NODE_ENV === "development") console.error("[Socket.io] Error in delete_messages handler:", err);
       }

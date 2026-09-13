@@ -254,6 +254,7 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
     if (selectedIds.size > 0) {
       const idsToDelete = Array.from(selectedIds);
 
+      const targetDeviceId = deviceId;
       if (snapEffectEnabled) {
         const elementsToSnap: HTMLElement[] = [];
         idsToDelete.forEach((id) => {
@@ -266,12 +267,14 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
         }
       }
 
-      deleteMessages(idsToDelete, false);
+      deleteMessages(idsToDelete, false, targetDeviceId);
       cancelSelection();
     }
   };
 
   const clearChat = async () => {
+    const targetDeviceId = deviceId;
+    const syncChoice = clearChatSync;
     setShowClearChatModal(false);
     closeMenu(true);
 
@@ -285,11 +288,14 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
       }
     }
 
-    deleteMessages('all', clearChatSync);
+    if (targetDeviceId) {
+      await deleteMessages('all', syncChoice, targetDeviceId);
+    }
   };
 
   useEffect(() => {
     if (!deviceId) return;
+    let cancelled = false;
     initialLoadDoneRef.current = false;
     knownMessageKeysRef.current.clear();
     liveMessageKeysRef.current.clear();
@@ -299,6 +305,7 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
     axios
       .get(`/api/chat?device_id=${deviceId}&limit=${limit}&offset=0`)
       .then((res) => {
+        if (cancelled) return;
         const newMsgs = res.data.data.messages;
         if (Array.isArray(newMsgs)) {
           newMsgs.forEach((m: any, i: number) => {
@@ -315,8 +322,13 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
           }
         }, 50);
       })
-      .catch(console.error);
+      .catch((err) => {
+        if (!cancelled) console.error(err);
+      });
     connectSocket(deviceId);
+    return () => {
+      cancelled = true;
+    };
   }, [deviceId, connectSocket, setMessages]);
 
   const handleScroll = () => {
@@ -370,31 +382,49 @@ function ChatWindow({ deviceId, deviceName, profileImage }: ChatWindowProps) {
   }, [messages]);
 
   const loadMore = async () => {
+    if (isLoadingMore || !deviceId) return;
     setIsLoadingMore(true);
+    const targetDeviceId = deviceId;
     const nextOffset = offset + limit;
 
     // Remember current scroll height to maintain scroll position after inserting messages at the top
     const previousScrollHeight = scrollRef.current?.scrollHeight || 0;
 
+    // W16: Cursor parameters for stable pagination
+    const oldestMsg = messages[0];
+    const beforeIdParam = oldestMsg?.id ? `&before_id=${oldestMsg.id}` : "";
+    const beforeTsParam = oldestMsg?.timestamp ? `&before_timestamp=${encodeURIComponent(oldestMsg.timestamp)}` : "";
+
     try {
-      const res = await axios.get(
-        `/api/chat?device_id=${deviceId}&limit=${limit}&offset=${nextOffset}`,
-      );
+      const url = `/api/chat?device_id=${targetDeviceId}&limit=${limit}&offset=${nextOffset}${beforeIdParam}${beforeTsParam}`;
+      const res = await axios.get(url);
       const olderMsgs = res.data.data.messages;
 
-      if (olderMsgs.length < limit) {
+      // W16: Discard late response if user switched chats during the fetch
+      if (deviceId !== targetDeviceId) return;
+
+      if (!Array.isArray(olderMsgs) || olderMsgs.length < limit) {
         setHasMore(false);
       }
 
-      if (olderMsgs.length > 0) {
-        if (Array.isArray(olderMsgs)) {
-          olderMsgs.forEach((m: any, i: number) => {
-            knownMessageKeysRef.current.add(getMsgKey(m, i));
-          });
-        }
+      if (Array.isArray(olderMsgs) && olderMsgs.length > 0) {
+        olderMsgs.forEach((m: any, i: number) => {
+          knownMessageKeysRef.current.add(getMsgKey(m, i));
+        });
         setOffset(nextOffset);
-        // Prepend older messages
-        setMessages([...olderMsgs, ...messages]);
+
+        // W16: Merge without dropping live-arrived messages or duplicating IDs
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id).filter(Boolean));
+          const uniqueOlder = olderMsgs.filter((m: any) => !existingIds.has(m.id));
+          if (uniqueOlder.length === 0) return prev;
+          const merged = [...uniqueOlder, ...prev].sort((a, b) => {
+            const timeA = a.timestamp ? new Date(a.timestamp).getTime() : (a.id || 0);
+            const timeB = b.timestamp ? new Date(b.timestamp).getTime() : (b.id || 0);
+            return timeA - timeB;
+          });
+          return merged;
+        });
 
         // Restore scroll position
         setTimeout(() => {
