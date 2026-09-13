@@ -1,5 +1,6 @@
 import { getChatByDeviceId, getPendingChatMessages, insertChatMessage, deleteMultipleChatMessages, deleteAllChatMessages } from "@/db/sqlite";
 import { ApiResponse } from "@/lib/utils/ApiResponse";
+import { isValidUploadFilename } from "@/lib/pathSafety";
 import { asyncHandler } from "@/lib/utils/asyncHandler";
 import { fetchOpenGraph } from "@/lib/utils/openGraph";
 
@@ -46,6 +47,10 @@ export const POST = asyncHandler(async (request: Request) => {
   // Prevent authenticated mobile clients from posting to other devices' chats
   if (authDeviceId && data.device_id && authDeviceId !== data.device_id) {
     return ApiResponse.error("Unauthorized: Cannot post to other device's chat", 403);
+  }
+
+  if (data.file_path && !isValidUploadFilename(data.file_path)) {
+    return ApiResponse.error("Invalid file_path: must be an opaque upload identifier", 400);
   }
 
   let finalPreviewData = data.preview_data;

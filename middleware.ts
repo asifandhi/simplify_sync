@@ -1,8 +1,22 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+function isValidLocalOrigin(originHeader: string, hostHeader: string | null): boolean {
+  try {
+    const originUrl = new URL(originHeader);
+    const host = hostHeader || '';
+    if (originUrl.host !== host) {
+      return false;
+    }
+    const hostname = originUrl.hostname;
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1';
+  } catch {
+    return false;
+  }
+}
+
 export async function middleware(request: NextRequest) {
-  const protectedRoutes = ['/api/chat', '/api/devices', '/api/transfer', '/api/upload', '/api/file', '/api/setting'];
+  const protectedRoutes = ['/api/chat', '/api/devices', '/api/transfer', '/api/upload', '/api/file', '/api/setting', '/api/discovery/qr'];
   
   const isProtected = protectedRoutes.some(route => 
     request.nextUrl.pathname.startsWith(route)
@@ -12,14 +26,45 @@ export async function middleware(request: NextRequest) {
     const sessionToken = request.headers.get('x-session-token');
 
     if (!sessionToken) {
-      // Verify the request IP is strictly 127.0.0.1/::1 before allowing tokenless access.
-      const ip = request.headers.get('x-forwarded-for');
-      if (ip !== '127.0.0.1' && ip !== '::1') {
+      // W01: Trust only server-derived local client identity (set by custom server after verifying TCP peer)
+      const isLocalClient = request.headers.get('x-is-local-client') === 'true';
+      if (!isLocalClient) {
         return NextResponse.json(
           { success: false, error: 'Unauthorized: Session token required' },
           { status: 401 }
         );
       }
+
+      // W01: Protect local browser mutations with exact-origin checks
+      const host = request.headers.get('host');
+      const origin = request.headers.get('origin');
+      const isMutation = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(request.method);
+
+      if (origin) {
+        if (!isValidLocalOrigin(origin, host)) {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Invalid origin' },
+            { status: 403 }
+          );
+        }
+      } else if (isMutation) {
+        const referer = request.headers.get('referer');
+        let validReferer = false;
+        if (referer) {
+          try {
+            validReferer = isValidLocalOrigin(new URL(referer).origin, host);
+          } catch {
+            validReferer = false;
+          }
+        }
+        if (!validReferer) {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Valid origin or referer required for local mutations' },
+            { status: 403 }
+          );
+        }
+      }
+
       return NextResponse.next();
     }
 

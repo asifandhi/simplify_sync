@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import path from "path";
-import fs from "fs";
+import { isValidUploadFilename, safeUnlinkUpload } from "@/lib/pathSafety";
 
 
 // Ensure we have a default path in case process.env is not fully loaded by Next.js yet
@@ -131,6 +131,9 @@ interface chatMessageInput {
 
 export function insertChatMessage(data: chatMessageInput) {
   try {
+    if (data.file_path && !isValidUploadFilename(data.file_path)) {
+      data.file_path = undefined;
+    }
     const stmt = db.prepare(
       `INSERT INTO chat_history (device_id, sender, content_type, content, file_path, preview_data, is_view_once, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     );
@@ -228,6 +231,17 @@ export function getAllDevices() {
   const stmt = db.prepare('SELECT * FROM devices ORDER BY last_active DESC');
   return stmt.all();
 }
+
+
+export function getAllDevicesPublic() {
+  const stmt = db.prepare('SELECT device_id, device_name, trust_level, last_active, is_trusted, created_at, profile_image FROM devices ORDER BY last_active DESC');
+  return stmt.all();
+}
+
+export function getDeviceByIdPublic(device_id: string) {
+  const stmt = db.prepare('SELECT device_id, device_name, trust_level, last_active, is_trusted, created_at, profile_image FROM devices WHERE device_id = ?');
+  return stmt.get(device_id) as any;
+}
 export function getDeviceBySessionToken(session_token: string) {
   const stmt = db.prepare('SELECT * FROM devices WHERE session_token = ?');
   const result = stmt.get(session_token) as any;
@@ -290,10 +304,7 @@ export function deleteDevice(deviceId: string) {
     
     files.forEach(row => {
       try {
-        const fullPath = path.join(process.cwd(), "uploads", row.file_path);
-        if (fs.existsSync(fullPath)) {
-          fs.unlinkSync(fullPath);
-        }
+        safeUnlinkUpload(row.file_path);
       } catch (err) {
         console.error("Failed to delete orphaned file:", row.file_path, err);
       }

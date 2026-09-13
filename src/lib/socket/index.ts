@@ -6,6 +6,8 @@ import path from "path";
 import { Server, Socket } from "socket.io";
 import { SocketEvents } from "./events";
 import { fetchOpenGraph } from "@/lib/utils/openGraph";
+import { isValidLocalOrigin, isLoopbackAddress } from "@/lib/localAccess";
+import { isValidUploadFilename } from "@/lib/pathSafety";
 
 let io: Server;
 
@@ -25,6 +27,27 @@ export function isDeviceOnline(deviceId: string): boolean {
     return false;
   }
   return sockets.size > 0;
+}
+
+export function isSocketAuthorizedForDevice(
+  socket: { data: { role?: string; device_id?: string; authenticated?: boolean }; rooms: Set<string> },
+  targetDeviceId: string | undefined
+): boolean {
+  if (!targetDeviceId || typeof targetDeviceId !== "string") {
+    return false;
+  }
+
+  // Mobile client: strictly locked to its authenticated device_id
+  if (socket.data.role === "mobile") {
+    return socket.data.authenticated === true && socket.data.device_id === targetDeviceId;
+  }
+
+  // Web client: must have web role and must have joined the device room
+  if (socket.data.role === "web") {
+    return socket.rooms.has(targetDeviceId);
+  }
+
+  return false;
 }
 
 export function initSocket(server: HTTPServer) {
@@ -50,20 +73,41 @@ export function initSocket(server: HTTPServer) {
     const sessionToken = socket.handshake.auth?.session_token;
 
     if (!sessionToken) {
-      // No token — only allow if the request originates from the same host (Web UI).
-      // In production the Origin header must match the server's own address.
-      const origin = socket.handshake.headers.origin || '';
-      const host = socket.handshake.headers.host || '';
-      const referer = socket.handshake.headers.referer || '';
+      // W02: Tokenless sockets must be from a verified loopback peer PLUS exact allowed-origin validation
+      const remoteAddress = socket.conn.remoteAddress || socket.handshake.address || (socket.request as any)?.socket?.remoteAddress;
+      const isLocal = isLoopbackAddress(remoteAddress);
 
-      // Same-origin check: allow if origin or referer matches host, or if origin header is omitted on same-origin requests
-      const isSameOrigin = (origin && host && origin.includes(host)) ||
-                           (referer && host && referer.includes(host)) ||
-                           !origin;
+      if (!isLocal) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn(`[Socket.io] Rejected tokenless connection from non-loopback address: ${remoteAddress}`);
+        }
+        return next(new Error("Unauthorized: tokenless access restricted to local loopback"));
+      }
 
-      if (!isSameOrigin) {
-        if (process.env.NODE_ENV === "development") console.warn(`[Socket.io] Rejected unauthenticated connection from origin: ${origin}`);
-        return next(new Error("Unauthorized: no session token and non-local origin"));
+      const rawHost = socket.handshake.headers.host;
+      const host = (Array.isArray(rawHost) ? rawHost[0] : rawHost) || '';
+      const rawOrigin = socket.handshake.headers.origin;
+      const origin = Array.isArray(rawOrigin) ? rawOrigin[0] : rawOrigin;
+      const rawReferer = socket.handshake.headers.referer || socket.handshake.headers.referrer;
+      const referer = Array.isArray(rawReferer) ? rawReferer[0] : rawReferer;
+
+      let isValidOrigin = false;
+      if (origin) {
+        isValidOrigin = isValidLocalOrigin(origin, host);
+      } else if (referer) {
+        try {
+          const refererOrigin = new URL(referer).origin;
+          isValidOrigin = isValidLocalOrigin(refererOrigin, host);
+        } catch {
+          isValidOrigin = false;
+        }
+      }
+
+      if (!isValidOrigin) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn(`[Socket.io] Rejected unauthenticated connection from invalid origin: ${origin} (referer: ${referer}, host: ${host})`);
+        }
+        return next(new Error("Unauthorized: valid local origin required"));
       }
 
       // Tag as web UI client — cannot use mobile-only events
@@ -123,8 +167,15 @@ export function initSocket(server: HTTPServer) {
     });
 
     socket.on(SocketEvents.REGISTER, (device_id: string) => {
-      if (socket.data.role === 'mobile') {
-        if (process.env.NODE_ENV === "development") console.log(`[Socket.io] Ignoring REGISTER from mobile client ${socket.id} (already bound to ${socket.data.device_id})`);
+      // W02: Only web clients can register for device rooms
+      if (socket.data.role !== 'web') {
+        if (process.env.NODE_ENV === "development") {
+          console.warn(`[Socket.io] Ignoring REGISTER from non-web client ${socket.id} (role: ${socket.data.role})`);
+        }
+        return;
+      }
+
+      if (!device_id || typeof device_id !== 'string') {
         return;
       }
 
@@ -151,18 +202,19 @@ export function initSocket(server: HTTPServer) {
     // Mobile: authenticated via socket.data.device_id
     // Web: identified by device_id in payload (must be in room)
     socket.on(SocketEvents.SEND_MESSAGE, async (data, callback) => {
-      const actualDeviceId = socket.data.device_id || data.device_id;
+      const actualDeviceId = socket.data.device_id || data?.device_id;
 
-      if (!actualDeviceId) {
-        if (process.env.NODE_ENV === "development") console.error("[Socket.io] Rejecting send_message: no device_id");
-        if (typeof callback === "function") callback({ error: "No device_id" });
+      if (!actualDeviceId || !isSocketAuthorizedForDevice(socket, actualDeviceId)) {
+        if (process.env.NODE_ENV === "development") {
+          console.error(`[Socket.io] Rejecting send_message: unauthorized for device '${actualDeviceId}'`);
+        }
+        if (typeof callback === "function") callback({ error: "Unauthorized for this device" });
         return;
       }
 
-      // For web clients, verify they're actually in the device's room
-      if (!socket.data.device_id && !socket.rooms.has(actualDeviceId)) {
-        if (process.env.NODE_ENV === "development") console.error(`[Socket.io] Rejecting send_message: web socket not in room '${actualDeviceId}'`);
-        if (typeof callback === "function") callback({ error: "Not registered for this device" });
+      const rawFilePath = data.file_path || data.filePath;
+      if (rawFilePath && !isValidUploadFilename(rawFilePath)) {
+        if (typeof callback === 'function') callback({ error: "Invalid file_path: must be an opaque upload identifier" });
         return;
       }
 
@@ -197,7 +249,7 @@ export function initSocket(server: HTTPServer) {
         sender,
         content_type: contentType,
         content: data.content,
-        file_path: data.file_path || data.filePath,
+        file_path: rawFilePath,
         preview_data: finalPreviewData,
         is_view_once: data.is_view_once || data.isViewOnce,
       });
@@ -247,7 +299,12 @@ export function initSocket(server: HTTPServer) {
 
     socket.on(SocketEvents.REQUEST_CHAT_SYNC, (data?: { device_id?: string }) => {
       const actualDeviceId = socket.data.device_id || data?.device_id;
-      if (!actualDeviceId) return;
+      if (!actualDeviceId || !isSocketAuthorizedForDevice(socket, actualDeviceId)) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn(`[Socket.io] Rejecting chat sync: unauthorized for device '${actualDeviceId}'`);
+        }
+        return;
+      }
       if (process.env.NODE_ENV === "development") console.log(`[Socket] Chat sync requested for device: ${actualDeviceId}`);
       
       // Deliver any pending clear-chat actions FIRST (so older messages are cleared before new ones arrive)
@@ -275,6 +332,12 @@ export function initSocket(server: HTTPServer) {
     socket.on(SocketEvents.MARK_DELIVERED, (data: { device_id?: string; message_ids: number[] }) => {
       const actualDeviceId = socket.data.device_id || data?.device_id;
       if (!actualDeviceId || !Array.isArray(data?.message_ids) || data.message_ids.length === 0) return;
+      if (!isSocketAuthorizedForDevice(socket, actualDeviceId)) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn(`[Socket.io] Rejecting mark_delivered: unauthorized for device '${actualDeviceId}'`);
+        }
+        return;
+      }
 
       if (process.env.NODE_ENV === "development") {
         console.log(`[Socket] Marking messages delivered for ${actualDeviceId}:`, data.message_ids);
@@ -290,7 +353,12 @@ export function initSocket(server: HTTPServer) {
 
     socket.on(SocketEvents.CLEAR_CHAT_ACK, (data: { device_id?: string; action_id: number }) => {
       const actualDeviceId = socket.data.device_id || data?.device_id;
-      if (!actualDeviceId || !data?.action_id) return;
+      if (!actualDeviceId || !data?.action_id || !isSocketAuthorizedForDevice(socket, actualDeviceId)) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn(`[Socket.io] Rejecting clear_chat_ack: unauthorized for device '${actualDeviceId}'`);
+        }
+        return;
+      }
       if (process.env.NODE_ENV === "development") {
         console.log(`[Socket] CLEAR_CHAT_ACK from ${actualDeviceId} for action_id: ${data.action_id}`);
       }
@@ -298,8 +366,13 @@ export function initSocket(server: HTTPServer) {
     });
 
     socket.on(SocketEvents.SYNC_PROFILE, (data: { device_id?: string; base64_image?: string; device_name?: string }) => {
-      const actualDeviceId = socket.data.device_id || data.device_id;
-      if (!actualDeviceId) return;
+      const actualDeviceId = socket.data.device_id || data?.device_id;
+      if (!actualDeviceId || !isSocketAuthorizedForDevice(socket, actualDeviceId)) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn(`[Socket.io] Rejecting sync_profile: unauthorized for device '${actualDeviceId}'`);
+        }
+        return;
+      }
 
       try {
         let fileUrl: string | undefined = undefined;
@@ -356,11 +429,13 @@ export function initSocket(server: HTTPServer) {
     // ── SINGLE EMIT PATH for deletes ─────────────────────────────────────
     // Both mobile and web clients send deletes through this handler.
     socket.on(SocketEvents.DELETE_MESSAGES, (payload: { device_id: string, message_ids: number[] | 'all' }) => {
-      const actualDeviceId = socket.data.device_id || payload.device_id;
-      if (!actualDeviceId) return;
-
-      // Mobile is locked to its authenticated socket.data.device_id; Web must be in the device room
-      if (!socket.data.device_id && !socket.rooms.has(actualDeviceId)) return;
+      const actualDeviceId = socket.data.device_id || payload?.device_id;
+      if (!actualDeviceId || !isSocketAuthorizedForDevice(socket, actualDeviceId)) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn(`[Socket.io] Rejecting delete_messages: unauthorized for device '${actualDeviceId}'`);
+        }
+        return;
+      }
       
       if (process.env.NODE_ENV === "development") console.log(`[Socket] Delete messages requested by ${socket.data.role} for ${actualDeviceId}:`, payload.message_ids);
       

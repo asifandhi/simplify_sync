@@ -12,6 +12,18 @@ export const DELETE = asyncHandler(
     try {
       const { id: deviceId } = await params;
 
+      const isLocalWeb = request.headers.get('x-is-local-client') === 'true';
+      const authenticatedDeviceId = request.headers.get('x-device-id');
+
+      if (authenticatedDeviceId) {
+        // Mobile-originated caller: strictly restricted to revoking its own device
+        if (authenticatedDeviceId !== deviceId) {
+          return ApiResponse.error("Forbidden: Cannot revoke other devices", 403);
+        }
+      } else if (!isLocalWeb) {
+        return ApiResponse.error("Forbidden: Cannot revoke other devices", 403);
+      }
+
       // Emit session_revoke BEFORE deleting so the socket room still exists
       try {
         const io = getIO();
