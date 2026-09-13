@@ -363,10 +363,19 @@ export function getPendingActions(device_id: string) {
   return stmt.all(device_id) as any[];
 }
 
-export function markActionApplied(action_id: number) {
+export function markActionApplied(action_id: number, device_id: string): { changes: number } {
   ensurePendingActionsTable();
-  const stmt = db.prepare(`UPDATE pending_actions SET applied = 1 WHERE id = ?`);
-  return stmt.run(action_id);
+  if (!Number.isSafeInteger(action_id) || action_id <= 0 || !device_id || typeof device_id !== "string") {
+    return { changes: 0 };
+  }
+  const stmt = db.prepare(`UPDATE pending_actions SET applied = 1 WHERE id = ? AND device_id = ? AND applied = 0`);
+  return stmt.run(action_id, device_id);
+}
+
+export function isDeviceRegistered(deviceId: string): boolean {
+  if (!deviceId || typeof deviceId !== "string") return false;
+  const row = db.prepare(`SELECT 1 FROM devices WHERE device_id = ?`).get(deviceId);
+  return !!row;
 }
 
 export function getSetting(key: string) {

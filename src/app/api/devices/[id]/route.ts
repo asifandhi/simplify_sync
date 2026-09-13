@@ -1,7 +1,7 @@
 import { deleteDevice } from "@/db/sqlite";
 import { ApiResponse } from "@/lib/utils/ApiResponse";
 import { NextRequest } from "next/server";
-import { getIO } from "@/lib/socket";
+import { getIO, disconnectDeviceSockets } from "@/lib/socket";
 import { asyncHandler } from "@/lib/utils/asyncHandler";
 
 export const DELETE = asyncHandler(
@@ -32,6 +32,13 @@ export const DELETE = asyncHandler(
         }
       } catch (e) {
         console.log("> Socket.io not initialized yet, skipping session_revoke emit.");
+      }
+
+      // W11: Force disconnect all sockets authenticated as this device
+      try {
+        disconnectDeviceSockets(deviceId);
+      } catch (e) {
+        console.error("> Error disconnecting device sockets:", e);
       }
 
       deleteDevice(deviceId);
