@@ -8,6 +8,7 @@ import { SocketEvents } from "./events";
 import { fetchOpenGraph } from "@/lib/utils/openGraph";
 import { isValidLocalOrigin, isLoopbackAddress } from "@/lib/localAccess";
 import { isValidUploadFilename } from "@/lib/pathSafety";
+import { saveProfileImage } from "./profileImage";
 
 let io: Server;
 
@@ -365,7 +366,7 @@ export function initSocket(server: HTTPServer) {
       markActionApplied(data.action_id);
     });
 
-    socket.on(SocketEvents.SYNC_PROFILE, (data: { device_id?: string; base64_image?: string; device_name?: string }) => {
+    socket.on(SocketEvents.SYNC_PROFILE, async (data: { device_id?: string; base64_image?: string; device_name?: string }) => {
       const actualDeviceId = socket.data.device_id || data?.device_id;
       if (!actualDeviceId || !isSocketAuthorizedForDevice(socket, actualDeviceId)) {
         if (process.env.NODE_ENV === "development") {
@@ -383,25 +384,7 @@ export function initSocket(server: HTTPServer) {
         }
 
         if (data.base64_image) {
-          const matches = data.base64_image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-          let base64Data = data.base64_image;
-          let ext = "jpg";
-
-          if (matches && matches.length === 3) {
-            ext = matches[1].split("/")[1] || "jpg";
-            base64Data = matches[2];
-          }
-
-          const fileName = `android-${actualDeviceId}-${Date.now()}.${ext}`;
-          const dirPath = path.join(process.cwd(), "public", "uploads", "profiles");
-
-          if (!fs.existsSync(dirPath)) {
-            fs.mkdirSync(dirPath, { recursive: true });
-          }
-
-          const filePath = path.join(dirPath, fileName);
-          fs.writeFileSync(filePath, base64Data, "base64");
-          fileUrl = `/uploads/profiles/${fileName}`;
+          fileUrl = await saveProfileImage(data.base64_image);
         }
 
         if (updatedName || fileUrl) {

@@ -5,6 +5,8 @@ import { stat } from "fs/promises";
 import { Readable } from "stream";
 import { NextResponse } from "next/server";
 import { join, basename } from "path";
+import { getSafeUploadPath } from "@/lib/pathSafety";
+import { getUploadOwner } from "@/db/sqlite";
 
 export const GET = asyncHandler(async (request: Request) => {
   const { searchParams } = new URL(request.url);
@@ -14,11 +16,15 @@ export const GET = asyncHandler(async (request: Request) => {
     throw new ApiError(400, "Path is required");
   }
 
-  // Use basename to securely strip any directory paths (including Windows backslashes)
-  const safeFilename = basename(inputPath);
+  const fullPath = getSafeUploadPath(inputPath);
+  if (!fullPath) throw new ApiError(400, "Invalid file identifier");
+  const safeFilename = inputPath;
+  const owner = getUploadOwner(inputPath);
+  const mobileId = request.headers.get("x-device-id");
+  const localWeb = request.headers.get("x-is-local-client") === "true" && !request.headers.has("x-session-token");
+  if (!owner || (mobileId ? mobileId !== owner : !localWeb)) throw new ApiError(403, "File access denied");
 
   try {
-    const fullPath = join(process.cwd(), "uploads", safeFilename);
     const fileStat = await stat(fullPath);
     if (!fileStat.isFile()) {
       throw new ApiError(404, "File not found");
@@ -64,7 +70,6 @@ export const GET = asyncHandler(async (request: Request) => {
         "Content-Type": contentType,
         "Content-Length": fileStat.size.toString(),
         "Content-Disposition": `${dispositionType}; filename="${safeFilename}"`,
-        "Access-Control-Allow-Origin": "*",
       },
     });
   } catch (error) {

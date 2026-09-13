@@ -23,6 +23,10 @@ export function connectDB() {
             created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
         );`
     );
+    db.exec(`CREATE TABLE IF NOT EXISTS upload_ownership (
+      file_id TEXT PRIMARY KEY,
+      device_id TEXT NOT NULL REFERENCES devices(device_id) ON DELETE CASCADE
+    )`);
 
     // Migration for profile_image
     try {
@@ -60,6 +64,11 @@ export function connectDB() {
             value TEXT            
         );`,
     );
+    // Only unambiguous legacy conversation references can establish ownership.
+    const legacy = db.prepare(`SELECT file_path, MIN(device_id) AS device_id FROM chat_history
+      WHERE file_path IS NOT NULL AND file_path != '' GROUP BY file_path HAVING COUNT(DISTINCT device_id) = 1`).all() as { file_path: string; device_id: string }[];
+    const migrate = db.prepare("INSERT OR IGNORE INTO upload_ownership (file_id, device_id) VALUES (?, ?)");
+    for (const row of legacy) if (isValidUploadFilename(row.file_path)) migrate.run(row.file_path, row.device_id);
   } catch (error) {
     console.error("Error connecting to the database:", error);
   }
@@ -373,4 +382,15 @@ export function setSetting(key: string, value: string) {
     ON CONFLICT(key) DO UPDATE SET value = excluded.value
   `);
   return stmt.run(key, value);
+}
+
+export function recordUploadOwner(fileId: string, deviceId: string) {
+  if (!isValidUploadFilename(fileId) || !getDeviceByIdPublic(deviceId)) throw new Error("Invalid upload owner");
+  db.prepare("INSERT INTO upload_ownership (file_id, device_id) VALUES (?, ?)").run(fileId, deviceId);
+}
+
+export function getUploadOwner(fileId: string): string | undefined {
+  const row = db.prepare(`SELECT u.device_id FROM upload_ownership u
+    JOIN devices d ON d.device_id = u.device_id WHERE u.file_id = ?`).get(fileId) as { device_id: string } | undefined;
+  return row?.device_id;
 }
